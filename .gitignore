@@ -1,0 +1,9 @@
+bot.log
+faiss_db
+venv/
+myvenv/
+analytics.jsonl
+__pycache__
+.env
+#.env.example
+#notion
