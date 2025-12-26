@@ -1,6 +1,7 @@
 import datetime
 import os
 from collections import defaultdict
+from typing import Dict
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -9,7 +10,7 @@ import config
 from analytics import Analytics
 from rag_system import rag_system
 
-user_contexts = defaultdict(dict)
+user_contexts: Dict[int, Dict] = defaultdict(dict)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,6 +86,9 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     rag_system.clear_memory(user_id)
 
+    if user_id in user_contexts:
+        user_contexts[user_id].clear()
+
     await update.message.reply_text(
         "*Dialog history cleared!*\n\nYou can start a new conversation.",
         parse_mode="Markdown",
@@ -104,6 +108,13 @@ Total queries: `{stats.get("total_queries", 0)}`
 Unique users: `{stats.get("unique_users", 0)}`
 Average response time: `{stats.get("avg_response_time", 0)}s`
 Average number of sources: `{stats.get("avg_sources", 0)}`
+
+*Feedback:*
+
+Likes: `{stats.get("total_likes", 0)}`
+Dislikes: `{stats.get("total_dislikes", 0)}`
+Satisfaction rate: `{stats.get("satisfaction_rate", 0)}%`
+
 
 Model: `{config.OLLAMA_MODEL}`
 """
@@ -189,6 +200,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id, username, question, answer, len(sources), response_time
     )
 
+    user_contexts[user_id]["last_question"] = question
+    user_contexts[user_id]["last_answer"] = answer
+    user_contexts[user_id]["last_sources"] = sources
+    user_contexts[user_id]["feedback_given"] = False
+
     keyboard = [
         [InlineKeyboardButton("Sources", callback_data=f"sources_{user_id}")],
         [InlineKeyboardButton("Clear Context", callback_data="clear_context")],
@@ -202,8 +218,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     formatted_answer = (
         f"{answer}\n\n_ Sources: {len(sources)} | Time: {response_time:.1f}s_"
     )
-
-    user_contexts[user_id]["last_sources"] = sources
 
     try:
         await update.message.reply_text(
@@ -226,6 +240,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_id = update.effective_user.id
+    username = update.effective_user.username or "Anonymous"
     data = query.data or ""
 
     if data == "help":
@@ -308,16 +323,38 @@ Database: Chroma
                 "Context cleared! Starting fresh conversation."
             )
 
-    elif data == "feedback_good":
+    elif data in ["feedback_good", "feedback_bad"]:
         if query.message:
-            await query.message.reply_text("Thank you for your feedback!")
+            if user_contexts[user_id].get("feedback_given", False):
+                await query.message.reply_text("You've already rated this answer!")
+                return
 
-    elif data == "feedback_bad":
-        if query.message:
-            await query.message.reply_text(
-                "Thank you for your feedback. I'll try to improve!\n"
-                "Try rephrasing your question or use /clear to start fresh."
+            if data == "feedback_good":
+                feedback = "like"
+            else:
+                feedback = "dislike"
+            question = user_contexts[user_id].get("last_question", "")
+            answer = user_contexts[user_id].get("last_answer", "")
+
+            if not question or not answer:
+                await query.message.reply_text(
+                    "Unable to save feedback - no recent query found."
+                )
+                return
+
+            await Analytics.update_feedback(
+                user_id, username, question, answer, feedback
             )
+
+            user_contexts[user_id]["feedback_given"] = True
+
+            if feedback == "like":
+                await query.message.reply_text("Thank you for your positive feedback!")
+            else:
+                await query.message.reply_text(
+                    "Thank you for your feedback!\n"
+                    "Try rephrasing your question or use /clear to start fresh."
+                )
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
