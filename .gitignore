@@ -5,5 +5,6 @@ myvenv/
 analytics.jsonl
 __pycache__
 .env
+.idea
 #.env.example
 #notion

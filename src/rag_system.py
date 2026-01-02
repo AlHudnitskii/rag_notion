@@ -1,4 +1,7 @@
 import os
+import time
+
+import requests
 from typing import Dict, List
 
 from langchain.chains import ConversationalRetrievalChain
@@ -8,9 +11,11 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 from langchain_ollama import OllamaLLM
 
 import config
+from notion_api_interactor import make_md_from_block, fetch_all_paginated_results
 
 
 class AdvancedLocalRAGSystem:
@@ -36,60 +41,85 @@ class AdvancedLocalRAGSystem:
             model=str(config.OLLAMA_MODEL),
             base_url=str(config.OLLAMA_BASE_URL),
             temperature=0,
-            num_ctx=4096,
+            num_ctx=2048,
             num_predict=512,
             repeat_penalty=1.1,
             top_k=40,
             top_p=0.9,
             stop=["<|end_of_text|>", "\nВОПРОС:", "ВОПРОС:"],
+            timeout=300.0
         )
         config.logger.info("Ollama has been initialized")
 
     def load_notion_documents(self) -> List:
-        export_path = "./notion"
+        config.logger.info("Loading local data from Notion API")
 
-        config.logger.info(f"Loading local data from folder: {export_path}")
-
-        if not os.path.exists(export_path):
-            config.logger.error(f"FOLDER NOT FOUND: {export_path}")
-            config.logger.error("Create 'notion' folder and add your .md files")
-            return []
-
-        md_files = []
-        for root, dirs, files in os.walk(export_path):
-            md_files.extend([os.path.join(root, f) for f in files if f.endswith(".md")])
-
-        if not md_files:
-            config.logger.error(f"NO .md FILES FOUND in {export_path}")
-            config.logger.error("Export your Notion database as Markdown & CSV")
-            return []
-
-        config.logger.info(f"Found {len(md_files)} .md files")
-
-        config.logger.info("Sample files:")
-        for f in md_files[:5]:
-            config.logger.info(f"   • {f}")
-        if len(md_files) > 5:
-            config.logger.info(f"   ... and {len(md_files) - 5} more")
+        headers = {
+            'Authorization': f"Bearer {config.NOTION_TOKEN}",
+            'Content-Type': 'application/json',
+            'Notion-Version': '2022-06-28'
+        }
+        search_params = {"filter": {"value": "page", "property": "object"}}
+        search_url = 'https://api.notion.com/v1/search'
 
         try:
-            config.logger.info("Loading documents with DirectoryLoader...")
-            loader = DirectoryLoader(
-                export_path,
-                glob="**/*.md",
-                loader_cls=TextLoader,
-                loader_kwargs={"encoding": "utf-8"},
-                show_progress=True,
-                use_multithreading=True,
+            all_pages = fetch_all_paginated_results(
+                url=search_url,
+                headers=headers,
+                method="POST",
+                params=search_params
             )
 
-            documents = loader.load()
-
-            if not documents:
-                config.logger.error("FILES FOUND BUT THEY ARE EMPTY!")
+            if not all_pages:
+                config.logger.warning("No pages found.")
                 return []
 
-            config.logger.info(f"SUCCESS! Loaded {len(documents)} documents.")
+            config.logger.info(f"Found {len(all_pages)} pages in Notion. Processing...")
+
+            documents = []
+            for i, page in enumerate(all_pages):
+                page_id = page['id']
+                page_url = page.get('url', '')
+                page_title = "Untitled"
+                props = page.get('properties', {})
+
+                for key, value in props.items():
+                    if value['type'] == 'title' and value['title']:
+                        page_title = value['title'][0]['plain_text']
+                        break
+
+                config.logger.info(f"[{i}] Content loading: {page_title}({page_id}) from {page_url}) ")
+
+                # Request for page children (paragraph, headers, etc)
+                blocks_url = f'https://api.notion.com/v1/blocks/{page_id}/children'
+
+                all_blocks = fetch_all_paginated_results(
+                    url=blocks_url,
+                    headers=headers,
+                    method="GET"
+                )
+
+                text_parts = []
+                for block in all_blocks:
+                    text_chunk = make_md_from_block(block)
+                    text_parts.append(text_chunk)
+
+                full_text = "".join(text_parts)
+
+                if not full_text.strip():
+                    continue
+
+                doc = Document(
+                    page_content=full_text,
+                    metadata={
+                        "title": page_title,
+                        "source": page_url,
+                        "doc_id": i,
+                        "id": page_id,
+                        "char_count": len(full_text)
+                    }
+                )
+                documents.append(doc)
 
             total_chars = sum(len(doc.page_content) for doc in documents)
             avg_chars = total_chars / len(documents) if documents else 0
@@ -99,46 +129,18 @@ class AdvancedLocalRAGSystem:
             config.logger.info(f"- Total characters: {total_chars:,}")
             config.logger.info(f"- Average per document: {avg_chars:.0f} chars")
 
-            empty_docs = [
-                i
-                for i, doc in enumerate(documents)
-                if len(doc.page_content.strip()) == 0
-            ]
-            if empty_docs:
-                config.logger.warning(f"Found {len(empty_docs)} empty documents!")
-
-            config.logger.info("Enhancing metadata...")
-            for i, doc in enumerate(documents):
-                source = doc.metadata.get("source", "")
-                filename = os.path.basename(source)
-
-                clean_name = filename.replace(".md", "")
-                parts = clean_name.rsplit(" ", 1)
-                if len(parts) == 2 and len(parts[1]) == 32:
-                    clean_name = parts[0]
-
-                doc.metadata = {
-                    "title": clean_name,
-                    "source": source,
-                    "doc_id": i,
-                    "char_count": len(doc.page_content),
-                }
-
-            config.logger.info("Metadata enhanced")
-
             if documents:
                 first_doc = documents[0]
                 preview = first_doc.page_content[:200].replace("\n", " ")
                 config.logger.info("First document preview:")
-                config.logger.info(
-                    f"   Title: {first_doc.metadata.get('title', 'N/A')}"
-                )
+                config.logger.info(f"   Title: {first_doc.metadata.get('title')}")
                 config.logger.info(f"   Content: {preview}...")
 
+            time.sleep(2)
             return documents
 
         except Exception as e:
-            config.logger.error(f"❌ Error loading documents: {e}")
+            config.logger.error(f"Error during loading documents from API: {e}")
             import traceback
 
             config.logger.error(traceback.format_exc())
@@ -301,7 +303,7 @@ class AdvancedLocalRAGSystem:
                 str(config.VECTOR_DB_PATH)
             )
 
-            if should_reload:
+            if  should_reload:
                 config.logger.info("Loading documents from Notion folder...")
 
                 documents = self.load_notion_documents()
