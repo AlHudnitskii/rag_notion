@@ -11,6 +11,7 @@ from handlers import (
     button_callback,
     clear_command,
     error_handler,
+    graphs_command,
     handle_message,
     help_command,
     model_command,
@@ -35,6 +36,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("clear", clear_command))
     application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CommandHandler("graphs", graphs_command))
     application.add_handler(CommandHandler("model", model_command))
     application.add_handler(CommandHandler("reload", reload_command))
     application.add_handler(CallbackQueryHandler(button_callback))

@@ -1,5 +1,4 @@
 import datetime
-import os
 from collections import defaultdict
 from typing import Dict
 
@@ -8,18 +7,22 @@ from telegram.ext import ContextTypes
 
 import config
 from analytics import Analytics
+from analytics_visualizer import AnalyticsVisualizer
+from rag_quality_metrics import RAGQualityMetrics
 from rag_system import rag_system
 
 user_contexts: Dict[int, Dict] = defaultdict(dict)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /start command."""
     if not update.message:
         return
 
     keyboard = [
         [InlineKeyboardButton("Help", callback_data="help")],
         [InlineKeyboardButton("Statistics", callback_data="stats")],
+        [InlineKeyboardButton("Graphs", callback_data="graphs")],
         [InlineKeyboardButton("Model", callback_data="model")],
         [InlineKeyboardButton("Update DB", callback_data="reload")],
     ]
@@ -33,6 +36,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 - Free and private
 - Remember conversation context
 - Work with your Notion notes
+- Analytics with graphs
 
 *Current model:* `{config.OLLAMA_MODEL}`
 
@@ -45,6 +49,7 @@ Simply ask a question!
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /help command."""
     if not update.message:
         return
 
@@ -80,6 +85,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /clear command."""
     if not update.effective_user or not update.message:
         return
 
@@ -96,6 +102,7 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /stats command."""
     if not update.message:
         return
 
@@ -153,6 +160,7 @@ async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /reload command."""
     if not update.message:
         return
 
@@ -175,7 +183,48 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
 
+async def graphs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /graphs command."""
+    if not update.message:
+        return
+
+    try:
+        usage_chart = await AnalyticsVisualizer.generate_usage_chart()
+        if usage_chart:
+            await update.message.reply_photo(photo=usage_chart, caption="Usage by day")
+
+        response_chart = await AnalyticsVisualizer.generate_response_time_chart()
+        if response_chart:
+            await update.message.reply_photo(
+                photo=response_chart, caption="Response time"
+            )
+
+        feedback_chart = await AnalyticsVisualizer.generate_feedback_pie_chart()
+        if feedback_chart:
+            await update.message.reply_photo(photo=feedback_chart, caption="Feedback")
+
+        sources_chart = await AnalyticsVisualizer.generate_sources_histogram()
+        if sources_chart:
+            await update.message.reply_photo(
+                photo=sources_chart, caption="Sources used"
+            )
+
+        generate_sources_histogram = (
+            await AnalyticsVisualizer.generate_sources_histogram()
+        )
+        if generate_sources_histogram:
+            await update.message.reply_photo(
+                photo=generate_sources_histogram, caption="Sources"
+            )
+
+    except Exception as e:
+        config.logger.error(f"Error generating graphs: {e}")
+        await update.message.reply_text("Error generating graphs")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle incoming messages."""
+
     if not update.effective_user or not update.message or not update.message.text:
         return
 
@@ -196,6 +245,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     answer = result["answer"]
     sources = result["sources"]
 
+    quality_metrics = await RAGQualityMetrics.evaluate_rag_response(
+        question=question, answer=answer, sources=sources, response_time=response_time
+    )
+
+    await RAGQualityMetrics.save_quality_metrics(
+        user_id=user_id, question=question, metrics=quality_metrics
+    )
+
     await Analytics.log_query(
         user_id, username, question, answer, len(sources), response_time
     )
@@ -203,10 +260,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_contexts[user_id]["last_question"] = question
     user_contexts[user_id]["last_answer"] = answer
     user_contexts[user_id]["last_sources"] = sources
+    user_contexts[user_id]["last_quality"] = quality_metrics
     user_contexts[user_id]["feedback_given"] = False
+
+    quality_indicator = RAGQualityMetrics.interpret_score(
+        quality_metrics["overall_score"]
+    )
 
     keyboard = [
         [InlineKeyboardButton("Sources", callback_data=f"sources_{user_id}")],
+        [InlineKeyboardButton("Quality", callback_data=f"quality_{user_id}")],
         [InlineKeyboardButton("Clear Context", callback_data="clear_context")],
         [
             InlineKeyboardButton("Like", callback_data="feedback_good"),
@@ -215,9 +278,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    formatted_answer = (
-        f"{answer}\n\n_ Sources: {len(sources)} | Time: {response_time:.1f}s_"
-    )
+    formatted_answer = f"{answer}\n\n_ Sources: {len(sources)} | Time: {response_time:.1f}s | Quality: {quality_indicator}_"
 
     try:
         await update.message.reply_text(
@@ -231,7 +292,45 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /quality command."""
+    if not update.message:
+        return
+
+    report = await RAGQualityMetrics.get_quality_report()
+
+    if "message" in report:
+        await update.message.reply_text(report["message"])
+        return
+
+    avg = report["average_metrics"]
+    dist = report["quality_distribution"]
+
+    quality_text = f"""
+*Report about RAG quality*
+
+*Average metrics:*
+• Relevance: `{avg.get("relevance", 0):.2%}`
+• Context utilization: `{avg.get("context_utilization", 0):.2%}`
+• Completeness: `{avg.get("completeness", 0):.2%}`
+• Efficiency: `{avg.get("efficiency", 0):.2%}`
+• *Overall score: `{avg.get("overall_score", 0):.2%}`*
+
+*Quality distribution:*
+Excellent: `{dist["excellent"]}`
+Good: `{dist["good"]}`
+Average: `{dist["average"]}`
+Poor: `{dist["poor"]}`
+
+Total evaluations: `{report["total_evaluations"]}`
+"""
+
+    await update.message.reply_text(quality_text, parse_mode="Markdown")
+
+
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle callback queries."""
+
     query = update.callback_query
 
     if not query or not update.effective_user:
@@ -276,6 +375,25 @@ Avg sources: `{stats.get("avg_sources", 0)}`
 """
             await query.message.reply_text(stats_text, parse_mode="Markdown")
 
+    elif data.startswith("quality_"):
+        if query.message:
+            quality = user_contexts[user_id].get("last_quality", {})
+            if quality:
+                quality_text = f"""
+*Quality of Last Answer:*
+
+• Relevance: `{quality.get("relevance", 0):.1%}`
+• Context Utilization: `{quality.get("context_utilization", 0):.1%}`
+• Completeness: `{quality.get("completeness", 0):.1%}`
+• Efficiency: `{quality.get("efficiency", 0):.1%}`
+
+*Overall Score: {RAGQualityMetrics.interpret_score(quality.get("overall_score", 0))}*
+`{quality.get("overall_score", 0):.1%}`
+"""
+                await query.message.reply_text(quality_text, parse_mode="Markdown")
+            else:
+                await query.message.reply_text("Metrics not available")
+
     elif data == "model":
         if query.message:
             model_info = f"""
@@ -287,6 +405,40 @@ Embeddings: Local
 Database: Chroma
 """
             await query.message.reply_text(model_info, parse_mode="Markdown")
+
+    elif data == "graphs":
+        if query.message:
+            try:
+                usage_chart = await AnalyticsVisualizer.generate_usage_chart()
+                if usage_chart:
+                    await query.message.reply_photo(
+                        photo=usage_chart, caption="Bot Usage"
+                    )
+
+                response_chart = (
+                    await AnalyticsVisualizer.generate_response_time_chart()
+                )
+                if response_chart:
+                    await query.message.reply_photo(
+                        photo=response_chart, caption="Response Time"
+                    )
+
+                feedback_chart = await AnalyticsVisualizer.generate_feedback_pie_chart()
+                if feedback_chart:
+                    await query.message.reply_photo(
+                        photo=feedback_chart, caption="Feedback"
+                    )
+
+                generate_sources_histogram = (
+                    await AnalyticsVisualizer.generate_sources_histogram()
+                )
+                if generate_sources_histogram:
+                    await query.message.reply_photo(
+                        photo=generate_sources_histogram, caption="Sources"
+                    )
+
+            except Exception as e:
+                await query.message.reply_text("Error generating graphs")
 
     elif data == "reload":
         if query.message:
@@ -307,10 +459,7 @@ Database: Chroma
                 sources_text = "*Sources:*\n\n"
                 for i, source in enumerate(sources[:3], 1):
                     title = source.metadata.get("title", "Untitled")
-                    source_path = source.metadata.get("source", "")
                     sources_text += f"{i}. {title}\n"
-                    if source_path:
-                        sources_text += f"   _({os.path.basename(source_path)})_\n"
 
                 await query.message.reply_text(sources_text, parse_mode="Markdown")
             else:
@@ -358,6 +507,8 @@ Database: Chroma
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle errors."""
+
     config.logger.error(f"Update {update} caused error: {context.error}")
 
     import traceback
