@@ -35,6 +35,8 @@ SEPARATORS = [
 
 VECTOR_DB_PATH = os.getenv("VECTOR_DB_PATH", "./faiss_db")
 ANALYTICS_FILE = os.getenv("ANALYTICS_FILE", "analytics.jsonl")
+FEEDBACK_FILE = os.getenv("FEEDBACK_FILE", "analytics_feedback.jsonl")
+QUALITY_FILE = os.getenv("QUALITY_FILE", "analytics_quality.jsonl")
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FILE = os.getenv("LOG_FILE", "bot_logfiles.log")

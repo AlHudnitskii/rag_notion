@@ -65,7 +65,7 @@ class RAGQualityMetrics:
             return 0.0
 
         source_count = len(sources)
-        optimal_sources = 4
+        optimal_sources = 3
         utilization = min(source_count / optimal_sources, 1.0)
 
         return utilization
@@ -131,8 +131,7 @@ class RAGQualityMetrics:
         user_id: int, question: str, metrics: Dict[str, float]
     ) -> None:
         """Save quality metrics"""
-        quality_file = config.ANALYTICS_FILE.replace(".jsonl", "_quality.jsonl")
-
+        quality_file = config.QUALITY_FILE
         entry = {
             "timestamp": datetime.now().isoformat(),
             "user_id": user_id,

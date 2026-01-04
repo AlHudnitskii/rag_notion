@@ -22,13 +22,21 @@ from handlers import (
 from rag_system import rag_system
 
 
-def main():
-    config.logger.info("Starting RagNotion bot...")
-    success = rag_system.initialize()
+async def post_init(application: Application) -> None:
+    """Callback after the bot has been initialized."""
+    config.logger.info("Initializing RAG system...")
+    success = await rag_system.initialize()
 
     if not success:
-        config.logger.error("Failed to initialize RagNotion system.")
-        return
+        config.logger.error("Failed to initialize RAG system.")
+        raise RuntimeError("RAG initialization failed")
+
+    config.logger.info("RAG system initialized.")
+
+
+def main():
+    """Initialize and run the RagNotion bot."""
+    config.logger.info("Starting RagNotion bot...")
 
     application = Application.builder().token(str(config.TELEGRAM_BOT_TOKEN)).build()
 
@@ -44,6 +52,8 @@ def main():
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
     )
     application.add_error_handler(error_handler)  # type: ignore
+
+    application.post_init = post_init
 
     application.run_polling()
 

@@ -302,7 +302,7 @@ class RAGSystem:
 
             config.logger.error(traceback.format_exc())
 
-    def initialize(self, force_reload: bool = False) -> bool:
+    async def initialize(self, force_reload: bool = False) -> bool:
         """Initialize RAG system."""
 
         config.logger.info("Initializing RAG system...")
@@ -313,72 +313,32 @@ class RAGSystem:
             )
 
             if should_reload:
-                headers = {
-                    "Authorization": f"Bearer {config.NOTION_TOKEN}",
-                    "Content-Type": "application/json",
-                    "Notion-Version": "2022-06-28",
-                }
-                search_params = {"filter": {"value": "page", "property": "object"}}
-                search_url = "https://api.notion.com/v1/search"
-
-                all_pages = fetch_all_paginated_results(
-                    search_url, headers, "POST", search_params
-                )
-
-                documents = []
-                for i, page in enumerate(all_pages):
-                    page_id = page["id"]
-                    page_url = page.get("url", "")
-                    page_title = "Untitled"
-
-                    props = page.get("properties", {})
-                    for key, value in props.items():
-                        if value["type"] == "title" and value["title"]:
-                            page_title = value["title"][0]["plain_text"]
-                            break
-
-                    blocks_url = f"https://api.notion.com/v1/blocks/{page_id}/children"
-                    all_blocks = fetch_all_paginated_results(
-                        blocks_url, headers, "GET", None
-                    )
-
-                    text_parts = []
-
-                    for block in all_blocks:
-                        text_parts.append(make_md_from_block(block))
-
-                    full_text = "".join(text_parts)
-                    if full_text.strip():
-                        doc = Document(
-                            page_content=full_text,
-                            metadata={
-                                "title": page_title,
-                                "source": page_url,
-                                "doc_id": i,
-                                "id": page_id,
-                                "char_count": len(full_text),
-                            },
-                        )
-                        documents.append(doc)
+                documents = await self.load_notion_documents_async()
 
                 if not documents:
+                    config.logger.error("No documents loaded")
                     return False
 
-                documents = MarkdownCleaner.clean_documents(documents)
                 chunks = self.split_documents(documents)
 
                 if not chunks:
+                    config.logger.error("No chunks created")
                     return False
 
                 self.create_vectorstore(chunks)
 
             else:
+                config.logger.info("Loading existing FAISS...")
                 self.load_vectorstore()
 
+            config.logger.info("RAG initialized successfully!")
             return True
 
         except Exception as e:
             config.logger.error(f"Initialization error: {e}")
+            import traceback
+
+            config.logger.error(traceback.format_exc())
             return False
 
     def query(self, question: str, user_id: int) -> Dict:

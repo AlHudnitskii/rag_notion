@@ -3871,3 +3871,67 @@ httpx.ConnectError: [WinError 10061] Подключение не установ�
 2026-01-03 21:08:44,332 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
 2026-01-03 21:08:49,928 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
 2026-01-03 21:08:59,987 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:52:11,372 - config - INFO - Initializing embedding model: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+2026-01-04 11:52:13,342 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+2026-01-04 11:52:19,965 - config - INFO - Embedding model has been loaded
+2026-01-04 11:52:19,966 - config - INFO - Initializing Ollama: http://localhost:11434, model: qwen2.5:7b
+2026-01-04 11:52:20,504 - config - INFO - Ollama has been initialized with optimizations
+2026-01-04 11:52:20,504 - config - INFO - Starting RagNotion bot...
+2026-01-04 11:52:21,810 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getMe "HTTP/1.1 200 OK"
+2026-01-04 11:52:21,811 - config - INFO - Initializing RAG system...
+2026-01-04 11:52:21,811 - config - INFO - Initializing RAG system...
+2026-01-04 11:52:21,811 - config - INFO - Loading existing FAISS...
+2026-01-04 11:52:21,824 - faiss.loader - INFO - Loading faiss with AVX2 support.
+2026-01-04 11:52:21,902 - faiss.loader - INFO - Successfully loaded faiss with AVX2 support.
+2026-01-04 11:52:21,923 - config - INFO - FAISS index loaded: 1003 vectors
+2026-01-04 11:52:21,924 - config - INFO - RAG initialized successfully!
+2026-01-04 11:52:21,924 - config - INFO - RAG system initialized.
+2026-01-04 11:52:22,132 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/deleteWebhook "HTTP/1.1 200 OK"
+2026-01-04 11:52:22,134 - apscheduler.scheduler - INFO - Scheduler started
+2026-01-04 11:52:22,134 - telegram.ext.Application - INFO - Application started
+2026-01-04 11:52:32,564 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:52:42,905 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:52:44,605 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:52:44,990 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-04 11:52:45,127 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-04 11:52:54,699 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:53:01,511 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:53:01,513 - config - INFO - Question from @elev3n1 (ID: 1620692076): Что такое вертикальное масштабирование7
+2026-01-04 11:53:01,846 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendChatAction "HTTP/1.1 200 OK"
+2026-01-04 11:53:01,847 - config - INFO - Cache MISS - processing query for user 1620692076
+2026-01-04 11:53:01,847 - config - INFO - Creating QA chain for user 1620692076
+2026-01-04 11:53:01,860 - config - INFO - QA chain successfully created for user 1620692076
+2026-01-04 11:53:42,725 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-04 11:53:54,240 - config - INFO - Answer generated: 228 chars, 2 sources
+2026-01-04 11:53:54,241 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:53:54,547 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-04 11:54:04,342 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:54:14,442 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:54:15,097 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:54:15,367 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-04 11:54:15,491 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-04 11:54:17,075 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:54:17,170 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-04 11:54:17,291 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-04 11:54:27,264 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:54:37,413 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:54:47,607 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:54:57,709 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:55:07,812 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:55:11,214 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:55:11,215 - config - INFO - Question from @elev3n1 (ID: 1620692076): Что такое рефлексия в C#?
+2026-01-04 11:55:11,511 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendChatAction "HTTP/1.1 200 OK"
+2026-01-04 11:55:11,512 - config - INFO - Cache MISS - processing query for user 1620692076
+2026-01-04 11:55:23,702 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-04 11:56:22,775 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-04 11:56:37,063 - config - INFO - Answer generated: 334 chars, 2 sources
+2026-01-04 11:56:37,064 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:56:37,443 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-04 11:56:41,842 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:56:41,938 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-04 11:56:42,078 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-04 11:56:52,058 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:56:55,312 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-04 11:56:55,312 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2026-01-04 11:56:55,313 - apscheduler.scheduler - INFO - Scheduler has been shut down
+2026-01-04 11:56:55,327 - telegram.ext.Application - INFO - Application.stop() complete
