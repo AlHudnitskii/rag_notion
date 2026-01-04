@@ -51,7 +51,7 @@ class Analytics:
             feedback=feedback,
         )
 
-        feedback_file = config.ANALYTICS_FILE.replace(".jsonl", "_feedback.jsonl")
+        feedback_file = config.FEEDBACK_FILE
         async with aiofiles.open(feedback_file, "a", encoding="utf-8") as f:
             await f.write(feedback_entry.model_dump_json() + "\n")
 

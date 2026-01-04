@@ -1,4 +1,10 @@
 bot.log
+analytics.jsonl
+analytics_feedback.jsonl
+analytics_quality.jsonl
+bot_logfiles.log
+rag_metrics.jsonl
+
 faiss_db
 venv/
 myvenv/
