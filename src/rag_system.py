@@ -1,20 +1,24 @@
 import asyncio
 import hashlib
 import os
+import re
 from typing import Dict, List, Optional
 
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import PromptTemplate
+from langchain.retrievers import EnsembleRetriever
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_ollama import OllamaLLM
 
 import config
-from markdown_cleaner import MarkdownCleaner
-from notion_api_interactor import fetch_all_paginated_results, make_md_from_block
+from notion_api_interactor import (extract_and_resolve_images,
+                                   fetch_all_paginated_results,
+                                   make_md_from_block)
 
 
 class RAGSystem:
@@ -23,12 +27,13 @@ class RAGSystem:
     def __init__(self):
         self.vectorstore = None
         self.qa_chains = {}
+        self.bm25_retriever = None
 
         self._search_cache = {}
         self._cache_max_size = 100
 
         self.max_context_messages = 6
-        self.max_tokens_per_context = 1500
+        self.max_tokens_per_context = 2500
 
         config.logger.info(f"Initializing embedding model: {config.EMBEDDING_MODEL}")
 
@@ -52,14 +57,13 @@ class RAGSystem:
         self.llm = OllamaLLM(
             model=str(config.OLLAMA_MODEL),
             base_url=str(config.OLLAMA_BASE_URL),
-            temperature=0,
-            num_ctx=1536,
+            temperature=0.1,
+            num_ctx=3072,
             num_predict=384,
             repeat_penalty=1.1,
             top_k=40,
             top_p=0.9,
             stop=["<|end_of_text|>", "\nВОПРОС:", "ВОПРОС:"],
-            # timeout=60.0,
             num_thread=4,
         )
         config.logger.info("Ollama has been initialized with optimizations")
@@ -84,8 +88,8 @@ class RAGSystem:
 
         self._search_cache[cache_key] = result
 
-    async def load_notion_documents_async(self) -> List:
-        """Async loading of documents from Notion."""
+    async def load_notion_documents_async(self) -> List[Document]:
+        """Async loading of documents from Notion API"""
 
         config.logger.info("Loading data from Notion API (async)")
 
@@ -134,14 +138,21 @@ class RAGSystem:
 
                 text_parts = []
 
+                current_page_images_map = {}
+
                 for block in all_blocks:
-                    text_chunk = make_md_from_block(block)
+                    text_chunk = make_md_from_block(block, current_page_images_map)
                     text_parts.append(text_chunk)
 
                 full_text = "".join(text_parts)
 
                 if not full_text.strip():
                     continue
+
+                img_count = len(current_page_images_map)
+                print(
+                    f"✅ Loaded: "{page_title}" | Лен: {len(full_text)} | Картинки: {img_count}"
+                )
 
                 doc = Document(
                     page_content=full_text,
@@ -151,16 +162,14 @@ class RAGSystem:
                         "doc_id": i,
                         "id": page_id,
                         "char_count": len(full_text),
+                        "image_map": current_page_images_map,
                     },
                 )
                 documents.append(doc)
 
-            config.logger.info(f"Statistics: {len(documents)} documents loaded")
-
-            config.logger.info("Cleaning documents...")
-            documents = MarkdownCleaner.clean_documents(documents)
-            config.logger.info(f"After cleaning: {len(documents)} documents")
-
+            config.logger.info(
+                f"Statistics: {len(documents)} source pages loaded (before splitting)"
+            )
             return documents
 
         except Exception as e:
@@ -181,7 +190,7 @@ class RAGSystem:
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=config.CHUNK_SIZE,
             chunk_overlap=config.CHUNK_OVERLAP,
-            length_function=len,
+            length_function=lambda text: len(text.split()),
             separators=config.SEPARATORS,
             is_separator_regex=False,
         )
@@ -213,6 +222,9 @@ class RAGSystem:
             os.makedirs(save_path, exist_ok=True)
             self.vectorstore.save_local(save_path)
 
+            self.bm25_retriever = BM25Retriever.from_documents(chunks)
+            self.bm25_retriever.k = 5
+
             config.logger.info(
                 f"FAISS index saved: {self.vectorstore.index.ntotal} vectors"
             )
@@ -222,26 +234,28 @@ class RAGSystem:
             raise
 
     def load_vectorstore(self):
-        """Load vectorstore."""
+        if not os.path.exists(config.VECTOR_DB_PATH):
+            raise FileNotFoundError("FAISS DB not found")
 
-        load_path = str(config.VECTOR_DB_PATH)
-
-        if not os.path.exists(load_path):
-            raise FileNotFoundError(f"FAISS index not found at {load_path}")
+        self.vectorstore = FAISS.load_local(
+            config.VECTOR_DB_PATH, self.embeddings, allow_dangerous_deserialization=True
+        )
 
         try:
-            self.vectorstore = FAISS.load_local(
-                load_path,
-                embeddings=self.embeddings,
-                allow_dangerous_deserialization=True,
-            )
+            docs = []
+            for doc_id, doc in self.vectorstore.docstore._dict.items():
+                docs.append(
+                    Document(page_content=doc.page_content, metadata=doc.metadata)
+                )
 
-            index_size = self.vectorstore.index.ntotal
-            config.logger.info(f"FAISS index loaded: {index_size} vectors")
-
+            if docs:
+                self.bm25_retriever = BM25Retriever.from_documents(docs)
+                self.bm25_retriever.k = 5
+                config.logger.info(f"BM25 restored with {len(docs)} docs")
+            else:
+                config.logger.warning("Vectorstore is empty inside! Cannot init BM25.")
         except Exception as e:
-            config.logger.error(f"Error loading FAISS: {e}")
-            raise
+            config.logger.error(f"Error restoring BM25: {e}")
 
     def create_qa_chain(self, user_id: int):
         """Create QA chain"""
@@ -256,12 +270,18 @@ class RAGSystem:
 
             CONDENSE_PROMPT = PromptTemplate.from_template(condense_template)
 
-            prompt_template = """КОНТЕКСТ:
+            prompt_template = """Ты - ассистент. Твоя задача - отвечать ИСКЛЮЧИТЕЛЬНО на основе контекста.
+        
+ИНСТРУКЦИЯ ПО ИЗОБРАЖЕНИЯМ:
+1. В тексте могут быть метки (img_xxxxxxxx) - это коды картинок.
+2. Если в контексте НЕТ таких меток, НЕ ПИШИ никаких ID (вроде img123456).
+3. Если метка есть и подходит по смыслу - напиши её в конце ответа.
+
+КОНТЕКСТ:
 {context}
 
 ВОПРОС: {question}
-
-ОТВЕТ (кратко и точно):"""
+ОТВЕТ (на русском):"""
 
             PROMPT = PromptTemplate(
                 template=prompt_template, input_variables=["context", "question"]
@@ -274,12 +294,23 @@ class RAGSystem:
                 output_key="answer",
             )
 
-            retriever = self.vectorstore.as_retriever(
+            faiss_retriever = self.vectorstore.as_retriever(
                 search_type="similarity",
                 search_kwargs={
-                    "k": 3,
+                    "k": 6,
                 },
             )
+
+            if self.bm25_retriever:
+                ensemble_retriever = EnsembleRetriever(
+                    retrievers=[self.bm25_retriever, faiss_retriever],
+                    weights=[0.4, 0.6],
+                )
+                retriever = ensemble_retriever
+                config.logger.info("Using Ensemble Retriever (Hybrid)")
+            else:
+                retriever = faiss_retriever
+                config.logger.info("Using FAISS Retriever (Vector only)")
 
             qa_chain = ConversationalRetrievalChain.from_llm(
                 llm=self.llm,
@@ -294,10 +325,12 @@ class RAGSystem:
             )
 
             self.qa_chains[user_id] = qa_chain
-            config.logger.info(f"QA chain successfully created for user {user_id}")
+            config.logger.info(f"QA цепочка успешно создана для пользователя {user_id}")
 
         except Exception as e:
-            config.logger.error(f"Error creating QA chain for user {user_id}: {e}")
+            config.logger.error(
+                f"Ошибка создания QA цепочки для пользователя {user_id}: {e}"
+            )
             import traceback
 
             config.logger.error(traceback.format_exc())
@@ -342,20 +375,15 @@ class RAGSystem:
             return False
 
     def query(self, question: str, user_id: int) -> Dict:
-        """Optimized query with caching."""
+        """Optimized query with source-based image extraction."""
 
         try:
             cache_key = self._generate_cache_key(question, user_id)
-            cached_result = self._get_from_cache(cache_key)
-
-            if cached_result:
-                config.logger.info(f"Cache HIT for user {user_id}")
-                return cached_result
-
-            config.logger.info(f"Cache MISS - processing query for user {user_id}")
+            cached = self._get_from_cache(cache_key)
+            if cached:
+                return cached
 
             if user_id not in self.qa_chains:
-                config.logger.info(f"Creating QA chain for user {user_id}")
                 self.create_qa_chain(user_id)
 
             qa_chain = self.qa_chains[user_id]
@@ -365,12 +393,48 @@ class RAGSystem:
             answer = response.get("answer", "")
             sources = response.get("source_documents", [])
 
-            result = {"answer": answer, "sources": sources}
+            # -- DEBUG PART --
+            print(f"\nDEBUG QUERY: "{question}"")
+            print(f"Sources found: {len(sources)}")
+            for idx, doc in enumerate(sources):
+                has_img = "img_" in doc.page_content
+                print(
+                    f"   [{idx + 1}] ...{doc.page_content[:40]}... (Has image? {has_img})"
+                )
+            # -----
+
+            final_images = []
+            seen_urls = set()
+
+            for doc in sources:
+                chunk_img_map = doc.metadata.get("image_map", {})
+
+                if not chunk_img_map:
+                    continue
+
+                found_ids = re.findall(r"(img_[a-f0-9]{8})", doc.page_content)
+
+                for img_id in found_ids:
+                    if img_id in chunk_img_map:
+                        url = chunk_img_map[img_id]
+                        if url not in seen_urls:
+                            final_images.append(url)
+                            seen_urls.add(url)
+
+            clean_answer = re.sub(r"\(?img_[a-f0-9]{8}\)?", "", answer)
+            clean_answer = re.sub(r"!\[.*?\]\(.*?\)", "", clean_answer)
+            clean_answer = clean_answer.strip()
+
+            result = {
+                "answer": clean_answer,
+                "images": final_images,
+                "sources": sources,
+            }
 
             self._save_to_cache(cache_key, result)
 
             config.logger.info(
-                f"Answer generated: {len(answer)} chars, {len(sources)} sources"
+                f"Answer generated. Found {len(final_images)} images in context."
             )
 
             return result
@@ -383,6 +447,7 @@ class RAGSystem:
 
             return {
                 "answer": "Error occurred. Try /clear or rephrase the question.",
+                "images": [],
                 "sources": [],
             }
 

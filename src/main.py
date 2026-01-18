@@ -1,24 +1,11 @@
-from telegram.ext import (
-    Application,
-    CallbackQueryHandler,
-    CommandHandler,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
+                          MessageHandler, filters)
 
 import config
-from handlers import (
-    button_callback,
-    clear_command,
-    error_handler,
-    graphs_command,
-    handle_message,
-    help_command,
-    model_command,
-    reload_command,
-    start_command,
-    stats_command,
-)
+from handlers import (button_callback, clear_command, error_handler,
+                      graphs_command, handle_message, help_command,
+                      model_command, reload_command, start_command,
+                      stats_command)
 from rag_system import rag_system
 
 
