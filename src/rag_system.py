@@ -32,8 +32,8 @@ class RAGSystem:
         self._search_cache = {}
         self._cache_max_size = 100
 
-        self.max_context_messages = 6
-        self.max_tokens_per_context = 2500
+        self.max_context_messages = 4
+        self.max_tokens_per_context = 4096
 
         config.logger.info(f"Initializing embedding model: {config.EMBEDDING_MODEL}")
 
@@ -58,7 +58,7 @@ class RAGSystem:
             model=str(config.OLLAMA_MODEL),
             base_url=str(config.OLLAMA_BASE_URL),
             temperature=0.1,
-            num_ctx=3072,
+            num_ctx=4096,
             num_predict=384,
             repeat_penalty=1.1,
             top_k=40,
@@ -151,7 +151,7 @@ class RAGSystem:
 
                 img_count = len(current_page_images_map)
                 print(
-                    f"✅ Loaded: "{page_title}" | Лен: {len(full_text)} | Картинки: {img_count}"
+                    f"✅ Loaded: '{page_title}' | Лен: {len(full_text)} | Картинки: {img_count}"
                 )
 
                 doc = Document(
@@ -297,7 +297,7 @@ class RAGSystem:
             faiss_retriever = self.vectorstore.as_retriever(
                 search_type="similarity",
                 search_kwargs={
-                    "k": 6,
+                    "k": 4,
                 },
             )
 
@@ -394,7 +394,7 @@ class RAGSystem:
             sources = response.get("source_documents", [])
 
             # -- DEBUG PART --
-            print(f"\nDEBUG QUERY: "{question}"")
+            print(f"\nDEBUG QUERY: '{question}'")
             print(f"Sources found: {len(sources)}")
             for idx, doc in enumerate(sources):
                 has_img = "img_" in doc.page_content
@@ -456,6 +456,7 @@ class RAGSystem:
 
         if user_id in self.qa_chains:
             self.qa_chains[user_id].memory.clear()
+            self._search_cache.clear()
             config.logger.info(f"Memory cleared for user {user_id}")
 
 

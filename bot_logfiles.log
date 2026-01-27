@@ -8610,3 +8610,112 @@ httpx.ConnectError: [WinError 10061] Подключение не установ�
 2026-01-18 23:53:11,032 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
 2026-01-18 23:53:11,034 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
 2026-01-18 23:53:11,034 - telegram.ext.Application - INFO - Application.stop() complete
+2026-01-28 00:27:48,485 - config - INFO - Initializing embedding model: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+2026-01-28 00:27:49,641 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+2026-01-28 00:27:53,020 - config - INFO - Embedding model has been loaded
+2026-01-28 00:27:53,020 - config - INFO - Initializing Ollama: http://localhost:11434, model: qwen2.5:1.5b-instruct-q4_k_m
+2026-01-28 00:27:53,348 - config - INFO - Ollama has been initialized with optimizations
+2026-01-28 00:27:53,348 - config - INFO - Starting RagNotion bot...
+2026-01-28 00:27:53,817 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getMe "HTTP/1.1 200 OK"
+2026-01-28 00:27:53,832 - config - INFO - Initializing RAG system...
+2026-01-28 00:27:53,832 - config - INFO - Initializing RAG system...
+2026-01-28 00:27:53,832 - config - INFO - Loading data from Notion API (async)
+2026-01-28 00:27:54,832 - config - INFO - Found 69 pages. Processing...
+2026-01-28 00:29:14,332 - config - INFO - Statistics: 69 source pages loaded (before splitting)
+2026-01-28 00:29:14,332 - config - INFO - Splitting 69 documents...
+2026-01-28 00:29:14,363 - config - INFO - Created 163 chunks
+2026-01-28 00:29:14,363 - config - INFO - Creating FAISS vectorstore with 163 chunks...
+2026-01-28 00:29:28,445 - faiss.loader - INFO - Loading faiss with AVX2 support.
+2026-01-28 00:29:28,492 - faiss.loader - INFO - Successfully loaded faiss with AVX2 support.
+2026-01-28 00:29:28,507 - faiss - INFO - Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+2026-01-28 00:29:28,601 - config - INFO - FAISS index saved: 163 vectors
+2026-01-28 00:29:28,601 - config - INFO - RAG initialized successfully!
+2026-01-28 00:29:28,601 - config - INFO - RAG system initialized.
+2026-01-28 00:29:28,758 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/deleteWebhook "HTTP/1.1 200 OK"
+2026-01-28 00:29:28,758 - telegram.ext.Application - INFO - Application started
+2026-01-28 00:29:38,919 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:29:42,359 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:29:47,118 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:29:47,278 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:29:54,438 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:29:54,438 - config - INFO - Question from @ekkateryy (ID: 1255597751): quality_command
+2026-01-28 00:29:54,586 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendChatAction "HTTP/1.1 200 OK"
+2026-01-28 00:29:54,594 - config - INFO - Using Ensemble Retriever (Hybrid)
+2026-01-28 00:29:54,594 - config - INFO - QA цепочка успешно создана для пользователя 1255597751
+2026-01-28 00:30:14,266 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:30:31,363 - config - INFO - Answer generated. Found 0 images in context.
+2026-01-28 00:30:31,363 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:30:31,504 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 400 Bad Request"
+2026-01-28 00:30:31,504 - config - ERROR - Error sending formatted message: Can't parse entities: can't find end of the entity starting at byte offset 2412
+2026-01-28 00:30:31,598 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:30:41,401 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:30:50,036 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:30:50,245 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-28 00:30:50,353 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:30:53,805 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:30:53,889 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-28 00:30:53,947 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:31:03,841 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:31:13,898 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:31:17,308 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:31:17,308 - config - INFO - Question from @ekkateryy (ID: 1255597751): сравни микросервисы и монолит
+2026-01-28 00:31:17,458 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendChatAction "HTTP/1.1 200 OK"
+2026-01-28 00:31:25,560 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:31:28,602 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:31:41,962 - config - INFO - Answer generated. Found 0 images in context.
+2026-01-28 00:31:41,962 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:31:42,134 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:31:52,002 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:32:02,045 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:32:12,098 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:32:21,357 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:32:21,357 - config - INFO - Question from @ekkateryy (ID: 1255597751): monolithic vs microsevices architecture
+2026-01-28 00:32:21,507 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendChatAction "HTTP/1.1 200 OK"
+2026-01-28 00:32:35,945 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:32:59,735 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:33:17,842 - config - INFO - Answer generated. Found 1 images in context.
+2026-01-28 00:33:17,842 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:33:18,049 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:33:19,628 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendPhoto "HTTP/1.1 200 OK"
+2026-01-28 00:33:27,883 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:33:32,995 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:33:33,137 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-28 00:33:33,208 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:33:43,052 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:33:53,098 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:33:54,757 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:33:54,757 - config - INFO - Question from @ekkateryy (ID: 1255597751): вертикальное масштабирование
+2026-01-28 00:33:54,908 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendChatAction "HTTP/1.1 200 OK"
+2026-01-28 00:34:17,781 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:34:46,348 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:35:04,924 - config - INFO - Answer generated. Found 1 images in context.
+2026-01-28 00:35:04,924 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:35:05,110 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:35:06,227 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendPhoto "HTTP/1.1 200 OK"
+2026-01-28 00:35:14,966 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:35:25,013 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:35:35,075 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:35:42,497 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:35:42,500 - config - INFO - Question from @ekkateryy (ID: 1255597751): приведи пример декораторов в питоне
+2026-01-28 00:35:42,648 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendChatAction "HTTP/1.1 200 OK"
+2026-01-28 00:36:16,108 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:37:04,010 - httpx - INFO - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-01-28 00:37:20,901 - config - INFO - Answer generated. Found 8 images in context.
+2026-01-28 00:37:20,901 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:37:21,073 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:37:22,509 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMediaGroup "HTTP/1.1 200 OK"
+2026-01-28 00:37:30,947 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:37:39,134 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:37:39,276 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-28 00:37:39,335 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:37:49,208 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:37:59,267 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:38:05,217 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:38:05,350 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-01-28 00:38:05,425 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/sendMessage "HTTP/1.1 200 OK"
+2026-01-28 00:38:15,250 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:38:25,308 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:38:35,353 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:38:40,358 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8311155303:AAFQ4nzJkL3OcW3Yv0XoNWUJ2dz8D41jTYo/getUpdates "HTTP/1.1 200 OK"
+2026-01-28 00:38:40,358 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2026-01-28 00:38:40,358 - telegram.ext.Application - INFO - Application.stop() complete

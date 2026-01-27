@@ -314,7 +314,7 @@ async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 *Average metrics:*
 • Relevance: `{avg.get("relevance", 0):.2%}`
-• Context utilization: `{avg.get("context_utilization", 0):.2%}`
+• Faithfulness: `{avg.get("faithfulness", 0):.2%}`
 • Completeness: `{avg.get("completeness", 0):.2%}`
 • Efficiency: `{avg.get("efficiency", 0):.2%}`
 • *Overall score: `{avg.get("overall_score", 0):.2%}`*
@@ -386,7 +386,7 @@ Avg sources: `{stats.get("avg_sources", 0)}`
 *Quality of Last Answer:*
 
 • Relevance: `{quality.get("relevance", 0):.1%}`
-• Context Utilization: `{quality.get("context_utilization", 0):.1%}`
+• Faithfulness: `{quality.get("faithfulness", 0):.1%}`
 • Completeness: `{quality.get("completeness", 0):.1%}`
 • Efficiency: `{quality.get("efficiency", 0):.1%}`
 
