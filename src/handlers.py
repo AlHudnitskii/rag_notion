@@ -2,7 +2,8 @@ import datetime
 from collections import defaultdict
 from typing import Dict
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
+                      InputMediaPhoto, Update)
 from telegram.ext import ContextTypes
 
 import config
@@ -63,6 +64,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /stats - Statistics
 /model - Model information
 /reload - Update database from Notion
+/graphs - Visualize statistics
 
 *Example questions:*
 • "Explain what closure is in Python"
@@ -209,14 +211,6 @@ async def graphs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 photo=sources_chart, caption="Sources used"
             )
 
-        generate_sources_histogram = (
-            await AnalyticsVisualizer.generate_sources_histogram()
-        )
-        if generate_sources_histogram:
-            await update.message.reply_photo(
-                photo=generate_sources_histogram, caption="Sources"
-            )
-
     except Exception as e:
         config.logger.error(f"Error generating graphs: {e}")
         await update.message.reply_text("Error generating graphs")
@@ -244,6 +238,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     answer = result["answer"]
     sources = result["sources"]
+    images = result.get("images", [])
 
     quality_metrics = await RAGQualityMetrics.evaluate_rag_response(
         question=question, answer=answer, sources=sources, response_time=response_time
@@ -284,6 +279,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             formatted_answer, parse_mode="Markdown", reply_markup=reply_markup
         )
+
+        if images:
+            if len(images) == 1:
+                await update.message.reply_photo(photo=images[0])
+            else:
+                media_group = [InputMediaPhoto(media=url) for url in images[:10]]
+                await update.message.reply_media_group(media=media_group)
+
     except Exception as e:
         config.logger.error(f"Error sending formatted message: {e}")
         await update.message.reply_text(
@@ -311,7 +314,7 @@ async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 *Average metrics:*
 • Relevance: `{avg.get("relevance", 0):.2%}`
-• Context utilization: `{avg.get("context_utilization", 0):.2%}`
+• Faithfulness: `{avg.get("faithfulness", 0):.2%}`
 • Completeness: `{avg.get("completeness", 0):.2%}`
 • Efficiency: `{avg.get("efficiency", 0):.2%}`
 • *Overall score: `{avg.get("overall_score", 0):.2%}`*
@@ -383,7 +386,7 @@ Avg sources: `{stats.get("avg_sources", 0)}`
 *Quality of Last Answer:*
 
 • Relevance: `{quality.get("relevance", 0):.1%}`
-• Context Utilization: `{quality.get("context_utilization", 0):.1%}`
+• Faithfulness: `{quality.get("faithfulness", 0):.1%}`
 • Completeness: `{quality.get("completeness", 0):.1%}`
 • Efficiency: `{quality.get("efficiency", 0):.1%}`
 

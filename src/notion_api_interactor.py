@@ -1,22 +1,41 @@
-from typing import Optional
+import re
+import uuid
+from typing import List, Optional
 
 import requests
 from requests import RequestException
 
 
-def make_md_from_block(block):
-    """Convert a Notion block to Markdown."""
+def make_md_from_block(block, image_map: dict) -> str:
     b_type = block["type"]
-    full_text = ""
+    block_content = block.get(b_type, {})
 
-    try:
-        rich_text = block[b_type]["rich_text"]
-        if rich_text:
-            full_text = "".join([item["plain_text"] for item in rich_text])
-        else:
-            return "No text provided"
-    except KeyError:
-        pass  # image found
+    # Pictures processing
+    if b_type == "image":
+        image = block["image"]
+        url = ""
+        if image["type"] == "external":
+            url = image["external"]["url"]
+        elif image["type"] == "file":
+            url = image["file"]["url"]
+
+        if not url:
+            return ""
+
+        img_id = f"img_{uuid.uuid4().hex[:8]}"
+        image_map[img_id] = url
+
+        caption_list = image.get("caption", [])
+        caption = "".join(t["plain_text"] for t in caption_list)
+
+        if not caption:
+            caption = "Image"
+
+        return f"\n![{caption}]({img_id})\n\n"
+
+    # Text processing
+    rich_text = block_content.get("rich_text", [])
+    full_text = "".join(item["plain_text"] for item in rich_text)
 
     match b_type:
         case "paragraph":
@@ -32,11 +51,16 @@ def make_md_from_block(block):
         case "numbered_list_item":
             return f"1. {full_text}\n"
         case "code":
-            return f"```\n{full_text}\n```\n\n"
-        case "image":
-            return "[IMAGE]"
+            lang = block_content.get("language", "")
+            return f"```{lang}\n{full_text}\n```\n\n"
+        case "quote":
+            return f"> {full_text}\n\n"
+        case "callout":
+            # Callout часто содержит эмодзи
+            icon = block_content.get("icon", {}).get("emoji", "")
+            return f"> {icon} {full_text}\n\n"
 
-    return full_text + "\n"
+    return ""
 
 
 # Notion API allows to get only 100 children/pages in a time, so we need to
@@ -76,3 +100,23 @@ def fetch_all_paginated_results(
             break
 
     return all_results
+
+
+def extract_and_resolve_images(text: str, image_map: dict) -> List[str]:
+    """
+    Searches for image IDs in the LLM response text and returns a list of URLs.
+    Supports the following formats: (img_...), [img_...], or just img_... inside the Markdown link.
+    """
+    resolved_urls = []
+    matches = re.findall(r"(img_[a-f0-9]{8})", text)
+
+    unique_keys = []
+    for m in matches:
+        if m not in unique_keys:
+            unique_keys.append(m)
+
+    for img_key in unique_keys:
+        if img_key in image_map:
+            resolved_urls.append(image_map[img_key])
+
+    return resolved_urls

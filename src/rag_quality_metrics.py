@@ -1,7 +1,8 @@
 import json
+import re
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import aiofiles
 
@@ -57,18 +58,30 @@ class RAGQualityMetrics:
         return min(relevance, 1.0)
 
     @staticmethod
-    async def calculate_context_utilization(
-        question: str, sources: List, answer: str
-    ) -> float:
-        """Calculate the context utilization score for a given answer based on sources."""
-        if not sources:
+    def _get_ngrams(text: str, n: int) -> Set[str]:
+        """Generate n-grams from text to capture phrases, not just words."""
+        words = [w.lower() for w in re.findall(r'\w+', text) if len(w) > 2]
+        if len(words) < n:
+            return set()
+        return set(" ".join(words[i: i + n]) for i in range(len(words) - n + 1))
+
+    @classmethod
+    async def calculate_faithfulness(cls, sources: List, answer: str) -> float:
+        """
+        Checks if the answer is actually grounded in the sources using Bigram overlap.
+        If the answer contains specific phrases not found in sources -> Hallucination risk.
+        """
+        if not sources or not answer:
             return 0.0
 
-        source_count = len(sources)
-        optimal_sources = 3
-        utilization = min(source_count / optimal_sources, 1.0)
+        source_text = " ".join([s.page_content for s in sources]).lower()
+        answer_bigrams = cls._get_ngrams(answer, 2)
 
-        return utilization
+        if not answer_bigrams:
+            return 0.0
+
+        matches = sum(1 for bg in answer_bigrams if bg in source_text)
+        return matches / len(answer_bigrams)
 
     @staticmethod
     async def calculate_answer_completeness(answer: str) -> float:
@@ -107,16 +120,16 @@ class RAGQualityMetrics:
         """Evaluate the quality of a RAG response."""
         metrics = {
             "relevance": await cls.calculate_relevance_score(sources, answer),
-            "context_utilization": await cls.calculate_context_utilization(
-                question, sources, answer
+            "faithfulness": await cls.calculate_faithfulness(
+               sources, answer
             ),
             "completeness": await cls.calculate_answer_completeness(answer),
             "efficiency": await cls.calculate_response_efficiency(response_time),
         }
 
         weights = {
-            "relevance": 0.35,
-            "context_utilization": 0.25,
+            "relevance": 0.25,
+            "faithfulness": 0.35,
             "completeness": 0.25,
             "efficiency": 0.15,
         }
