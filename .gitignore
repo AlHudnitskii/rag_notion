@@ -12,5 +12,6 @@ analytics.jsonl
 __pycache__
 .env
 .idea
+models_cache/
 #.env.example
 #notion
