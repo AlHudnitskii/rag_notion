@@ -4,6 +4,7 @@ import os
 import re
 from typing import Dict, List, Optional
 
+import numpy as np
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import PromptTemplate
@@ -16,145 +17,111 @@ from langchain_core.documents import Document
 from langchain_ollama import OllamaLLM
 
 import config
-from notion_api_interactor import (extract_and_resolve_images,
-                                   fetch_all_paginated_results,
-                                   make_md_from_block)
+from notion_api_interactor import fetch_all_paginated_results, make_md_from_block
 
 
 class RAGSystem:
-    """Optimized RAG system with caching and parallel processing"""
-
     def __init__(self):
         self.vectorstore = None
         self.qa_chains = {}
         self.bm25_retriever = None
-
+        self._doc_image_maps: Dict[str, Dict[str, str]] = {}
         self._search_cache = {}
         self._cache_max_size = 100
-
-        self.max_context_messages = 4
-        self.max_tokens_per_context = 4096
-
-        config.logger.info(f"Initializing embedding model: {config.EMBEDDING_MODEL}")
+        self.max_context_messages = 3
+        self.max_tokens_per_context = 3000
 
         self.embeddings = HuggingFaceEmbeddings(
             model_name=config.EMBEDDING_MODEL,
-            model_kwargs={
-                "device": "cpu",
-            },
-            encode_kwargs={
-                "normalize_embeddings": True,
-                "batch_size": 32,
-            },
-        )
-
-        config.logger.info("Embedding model has been loaded")
-
-        config.logger.info(
-            f"Initializing Ollama: {config.OLLAMA_BASE_URL}, model: {config.OLLAMA_MODEL}"
+            model_kwargs={"device": "cpu"},
+            encode_kwargs={"normalize_embeddings": True, "batch_size": 64},
         )
 
         self.llm = OllamaLLM(
             model=str(config.OLLAMA_MODEL),
             base_url=str(config.OLLAMA_BASE_URL),
             temperature=0.1,
-            num_ctx=4096,
-            num_predict=384,
+            num_ctx=3000,
+            num_predict=512,
             repeat_penalty=1.1,
-            top_k=40,
-            top_p=0.9,
-            stop=["<|end_of_text|>", "\nВОПРОС:", "ВОПРОС:"],
-            num_thread=4,
+            top_k=20,
+            top_p=0.85,
+            stop=["<|end_of_text|>", "\nВОПРОС:", "ВОПРОС:", "\nUser:", "\nHuman:"],
+            num_thread=os.cpu_count() or 4,
         )
-        config.logger.info("Ollama has been initialized with optimizations")
 
-    def _generate_cache_key(self, question: str, user_id: int) -> str:
-        """Generate cache key for request."""
+    def _generate_cache_key(self, question: str, user_id: int, history_len: int) -> str:
+        return hashlib.md5(f"{user_id}:{history_len}:{question.lower().strip()}".encode()).hexdigest()
 
-        cache_str = f"{user_id}:{question.lower().strip()}"
-        return hashlib.md5(cache_str.encode()).hexdigest()
+    def _get_from_cache(self, key: str) -> Optional[Dict]:
+        return self._search_cache.get(key)
 
-    def _get_from_cache(self, cache_key: str) -> Optional[Dict]:
-        """Get result from cache."""
-
-        return self._search_cache.get(cache_key)
-
-    def _save_to_cache(self, cache_key: str, result: Dict):
-        """Save result to cache."""
-
+    def _save_to_cache(self, key: str, result: Dict):
         if len(self._search_cache) >= self._cache_max_size:
-            oldest_key = next(iter(self._search_cache))
-            del self._search_cache[oldest_key]
+            del self._search_cache[next(iter(self._search_cache))]
+        self._search_cache[key] = result
 
-        self._search_cache[cache_key] = result
+    def _resolve_images_from_sources(self, sources: List[Document]) -> List[str]:
+        final_images = []
+        seen_urls = set()
+        for doc in sources:
+            for url in doc.metadata.get("chunk_images", {}).values():
+                if url not in seen_urls:
+                    final_images.append(url)
+                    seen_urls.add(url)
+        return final_images
 
     async def load_notion_documents_async(self) -> List[Document]:
-        """Async loading of documents from Notion API"""
-
-        config.logger.info("Loading data from Notion API (async)")
-
+        config.logger.info("Loading data from Notion API")
         headers = {
             "Authorization": f"Bearer {config.NOTION_TOKEN}",
             "Content-Type": "application/json",
             "Notion-Version": "2022-06-28",
         }
-        search_params = {"filter": {"value": "page", "property": "object"}}
-        search_url = "https://api.notion.com/v1/search"
-
         try:
             loop = asyncio.get_event_loop()
             all_pages = await loop.run_in_executor(
                 None,
                 fetch_all_paginated_results,
-                search_url,
+                "https://api.notion.com/v1/search",
                 headers,
                 "POST",
-                search_params,
+                {"filter": {"value": "page", "property": "object"}},
             )
-
             if not all_pages:
-                config.logger.warning("No pages found.")
                 return []
 
-            config.logger.info(f"Found {len(all_pages)} pages. Processing...")
-
             documents = []
+            self._doc_image_maps = {}
+
             for i, page in enumerate(all_pages):
                 page_id = page["id"]
                 page_url = page.get("url", "")
                 page_title = "Untitled"
-                props = page.get("properties", {})
-
-                for key, value in props.items():
+                for value in page.get("properties", {}).values():
                     if value["type"] == "title" and value["title"]:
                         page_title = value["title"][0]["plain_text"]
                         break
 
-                blocks_url = f"https://api.notion.com/v1/blocks/{page_id}/children"
-
                 all_blocks = await loop.run_in_executor(
-                    None, fetch_all_paginated_results, blocks_url, headers, "GET", None
+                    None,
+                    fetch_all_paginated_results,
+                    f"https://api.notion.com/v1/blocks/{page_id}/children",
+                    headers,
+                    "GET",
+                    None,
                 )
 
-                text_parts = []
-
-                current_page_images_map = {}
-
-                for block in all_blocks:
-                    text_chunk = make_md_from_block(block, current_page_images_map)
-                    text_parts.append(text_chunk)
-
-                full_text = "".join(text_parts)
+                current_page_images_map: Dict[str, str] = {}
+                full_text = "".join(make_md_from_block(b, current_page_images_map) for b in all_blocks)
 
                 if not full_text.strip():
                     continue
 
-                img_count = len(current_page_images_map)
-                print(
-                    f"✅ Loaded: '{page_title}' | Лен: {len(full_text)} | Картинки: {img_count}"
-                )
+                self._doc_image_maps[page_id] = current_page_images_map
+                print(f"{page_title} | {len(full_text)} chars | {len(current_page_images_map)} images")
 
-                doc = Document(
+                documents.append(Document(
                     page_content=full_text,
                     metadata={
                         "title": page_title,
@@ -162,223 +129,202 @@ class RAGSystem:
                         "doc_id": i,
                         "id": page_id,
                         "char_count": len(full_text),
-                        "image_map": current_page_images_map,
                     },
-                )
-                documents.append(doc)
+                ))
 
-            config.logger.info(
-                f"Statistics: {len(documents)} source pages loaded (before splitting)"
-            )
+            config.logger.info(f"Loaded {len(documents)} pages")
             return documents
-
         except Exception as e:
             config.logger.error(f"Error loading documents: {e}")
             import traceback
-
             config.logger.error(traceback.format_exc())
             return []
 
     def split_documents(self, documents: List) -> List:
-        """Optimized document splitting."""
-
         if not documents:
             return []
-
-        config.logger.info(f"Splitting {len(documents)} documents...")
-
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=config.CHUNK_SIZE,
             chunk_overlap=config.CHUNK_OVERLAP,
-            length_function=lambda text: len(text.split()),
+            length_function=len,
             separators=config.SEPARATORS,
             is_separator_regex=False,
         )
-
         try:
             chunks = text_splitter.split_documents(documents)
+            for chunk in chunks:
+                page_id = chunk.metadata.get("id", "")
+                doc_image_map = self._doc_image_maps.get(page_id, {})
+                found_ids = re.findall(r"(img_[a-f0-9]{8})", chunk.page_content)
+                chunk.metadata["chunk_images"] = {
+                    img_id: doc_image_map[img_id]
+                    for img_id in found_ids
+                    if img_id in doc_image_map
+                }
             config.logger.info(f"Created {len(chunks)} chunks")
             return chunks
-
         except Exception as e:
             config.logger.error(f"Error splitting: {e}")
             return []
 
     def create_vectorstore(self, chunks: List) -> None:
-        """Create vectorstore."""
-
         if not chunks:
             return
-
-        config.logger.info(f"Creating FAISS vectorstore with {len(chunks)} chunks...")
-
-        try:
-            self.vectorstore = FAISS.from_documents(
-                documents=chunks,
-                embedding=self.embeddings,
-            )
-
-            save_path = str(config.VECTOR_DB_PATH)
-            os.makedirs(save_path, exist_ok=True)
-            self.vectorstore.save_local(save_path)
-
-            self.bm25_retriever = BM25Retriever.from_documents(chunks)
-            self.bm25_retriever.k = 5
-
-            config.logger.info(
-                f"FAISS index saved: {self.vectorstore.index.ntotal} vectors"
-            )
-
-        except Exception as e:
-            config.logger.error(f"Error creating vectorstore: {e}")
-            raise
+        self.vectorstore = FAISS.from_documents(documents=chunks, embedding=self.embeddings)
+        save_path = str(config.VECTOR_DB_PATH)
+        os.makedirs(save_path, exist_ok=True)
+        self.vectorstore.save_local(save_path)
+        self.bm25_retriever = BM25Retriever.from_documents(chunks)
+        self.bm25_retriever.k = 3
+        config.logger.info(f"FAISS saved: {self.vectorstore.index.ntotal} vectors")
 
     def load_vectorstore(self):
         if not os.path.exists(config.VECTOR_DB_PATH):
             raise FileNotFoundError("FAISS DB not found")
-
         self.vectorstore = FAISS.load_local(
             config.VECTOR_DB_PATH, self.embeddings, allow_dangerous_deserialization=True
         )
-
-        try:
-            docs = []
-            for doc_id, doc in self.vectorstore.docstore._dict.items():
-                docs.append(
-                    Document(page_content=doc.page_content, metadata=doc.metadata)
-                )
-
-            if docs:
-                self.bm25_retriever = BM25Retriever.from_documents(docs)
-                self.bm25_retriever.k = 5
-                config.logger.info(f"BM25 restored with {len(docs)} docs")
-            else:
-                config.logger.warning("Vectorstore is empty inside! Cannot init BM25.")
-        except Exception as e:
-            config.logger.error(f"Error restoring BM25: {e}")
+        docs = [
+            Document(page_content=doc.page_content, metadata=doc.metadata)
+            for doc in self.vectorstore.docstore._dict.values()
+        ]
+        if docs:
+            self.bm25_retriever = BM25Retriever.from_documents(docs)
+            self.bm25_retriever.k = 3
+            for doc in docs:
+                page_id = doc.metadata.get("id", "")
+                chunk_images = doc.metadata.get("chunk_images", {})
+                if page_id and chunk_images:
+                    self._doc_image_maps.setdefault(page_id, {}).update(chunk_images)
 
     def create_qa_chain(self, user_id: int):
-        """Create QA chain"""
         if self.vectorstore is None:
-            config.logger.error("Cannot create QA chain: vectorstore is None")
             return
 
-        try:
-            condense_template = """История: {chat_history}
-Вопрос: {question}
-Перефразируй на русском:"""
+        condense_template = """На основе истории диалога и нового вопроса, сформулируй самодостаточный вопрос на русском языке.
+Если вопрос не связан с историей — верни его без изменений.
 
-            CONDENSE_PROMPT = PromptTemplate.from_template(condense_template)
+История диалога:
+{chat_history}
 
-            prompt_template = """Ты - ассистент. Твоя задача - отвечать ИСКЛЮЧИТЕЛЬНО на основе контекста.
-        
-ИНСТРУКЦИЯ ПО ИЗОБРАЖЕНИЯМ:
-1. В тексте могут быть метки (img_xxxxxxxx) - это коды картинок.
-2. Если в контексте НЕТ таких меток, НЕ ПИШИ никаких ID (вроде img123456).
-3. Если метка есть и подходит по смыслу - напиши её в конце ответа.
+Новый вопрос: {question}
+
+Самодостаточный вопрос на русском:"""
+
+        prompt_template = """Ты — ассистент. Твой единственный источник знаний — КОНТЕКСТ ниже.
+
+СТРОГИЕ ПРАВИЛА (нарушение недопустимо):
+1. Используй ТОЛЬКО информацию из КОНТЕКСТА. Никаких знаний из обучения.
+2. Если ответа нет в КОНТЕКСТЕ — выведи ровно одну строку: "Информация отсутствует в базе знаний."
+3. Не дополняй, не домысливай, не расширяй ответ за пределы КОНТЕКСТА.
+4. Отвечай на русском языке.
 
 КОНТЕКСТ:
 {context}
 
 ВОПРОС: {question}
-ОТВЕТ (на русском):"""
 
-            PROMPT = PromptTemplate(
+ОТВЕТ (только из контекста):"""
+
+        memory = ConversationBufferWindowMemory(
+            k=self.max_context_messages,
+            memory_key="chat_history",
+            return_messages=True,
+            output_key="answer",
+        )
+
+        faiss_retriever = self.vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={"k": 5, "fetch_k": 15, "lambda_mult": 0.7},
+        )
+
+        if self.bm25_retriever:
+            self.bm25_retriever.k = 5
+            ensemble = EnsembleRetriever(
+                retrievers=[self.bm25_retriever, faiss_retriever],
+                weights=[0.4, 0.6],
+            )
+            seen_in_retriever = set()
+            _k = 3
+
+            def _dedup_invoke(query, _e=ensemble, _seen=seen_in_retriever, _k=_k):
+                docs = _e.invoke(query)
+                result = []
+                seen = set()
+                for doc in docs:
+                    key = doc.page_content[:200]
+                    if key not in seen:
+                        seen.add(key)
+                        result.append(doc)
+                    if len(result) >= _k:
+                        break
+                return result
+
+            from langchain_core.retrievers import BaseRetriever
+            from langchain_core.callbacks import CallbackManagerForRetrieverRun
+
+            class _DeduplicatingRetriever(BaseRetriever):
+                def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun = None):
+                    docs = ensemble.invoke(query)
+                    result, seen = [], set()
+                    for doc in docs:
+                        key = doc.page_content[:200]
+                        if key not in seen:
+                            seen.add(key)
+                            result.append(doc)
+                        if len(result) >= 3:
+                            break
+                    return result
+
+            retriever = _DeduplicatingRetriever()
+        else:
+            retriever = faiss_retriever
+
+        self.qa_chains[user_id] = ConversationalRetrievalChain.from_llm(
+            llm=self.llm,
+            retriever=retriever,
+            memory=memory,
+            return_source_documents=True,
+            condense_question_prompt=PromptTemplate.from_template(condense_template),
+            combine_docs_chain_kwargs={"prompt": PromptTemplate(
                 template=prompt_template, input_variables=["context", "question"]
-            )
-
-            memory = ConversationBufferWindowMemory(
-                k=self.max_context_messages,
-                memory_key="chat_history",
-                return_messages=True,
-                output_key="answer",
-            )
-
-            faiss_retriever = self.vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={
-                    "k": 4,
-                },
-            )
-
-            if self.bm25_retriever:
-                ensemble_retriever = EnsembleRetriever(
-                    retrievers=[self.bm25_retriever, faiss_retriever],
-                    weights=[0.4, 0.6],
-                )
-                retriever = ensemble_retriever
-                config.logger.info("Using Ensemble Retriever (Hybrid)")
-            else:
-                retriever = faiss_retriever
-                config.logger.info("Using FAISS Retriever (Vector only)")
-
-            qa_chain = ConversationalRetrievalChain.from_llm(
-                llm=self.llm,
-                retriever=retriever,
-                memory=memory,
-                return_source_documents=True,
-                condense_question_prompt=CONDENSE_PROMPT,
-                combine_docs_chain_kwargs={"prompt": PROMPT},
-                get_chat_history=lambda h: h,
-                verbose=False,
-                max_tokens_limit=self.max_tokens_per_context,
-            )
-
-            self.qa_chains[user_id] = qa_chain
-            config.logger.info(f"QA цепочка успешно создана для пользователя {user_id}")
-
-        except Exception as e:
-            config.logger.error(
-                f"Ошибка создания QA цепочки для пользователя {user_id}: {e}"
-            )
-            import traceback
-
-            config.logger.error(traceback.format_exc())
+            )},
+            get_chat_history=lambda h: h,
+            verbose=False,
+            max_tokens_limit=self.max_tokens_per_context,
+        )
 
     async def initialize(self, force_reload: bool = False) -> bool:
-        """Initialize RAG system."""
-
         config.logger.info("Initializing RAG system...")
-
         try:
-            should_reload = force_reload or not os.path.exists(
-                str(config.VECTOR_DB_PATH)
-            )
-
-            if should_reload:
+            if force_reload or not os.path.exists(str(config.VECTOR_DB_PATH)):
                 documents = await self.load_notion_documents_async()
-
                 if not documents:
-                    config.logger.error("No documents loaded")
                     return False
-
                 chunks = self.split_documents(documents)
-
                 if not chunks:
-                    config.logger.error("No chunks created")
                     return False
-
                 self.create_vectorstore(chunks)
-
             else:
-                config.logger.info("Loading existing FAISS...")
                 self.load_vectorstore()
-
-            config.logger.info("RAG initialized successfully!")
+            config.logger.info("RAG initialized!")
             return True
-
         except Exception as e:
             config.logger.error(f"Initialization error: {e}")
             import traceback
-
             config.logger.error(traceback.format_exc())
             return False
 
     def query(self, question: str, user_id: int) -> Dict:
-        """Optimized query with source-based image extraction."""
-
         try:
-            cache_key = self._generate_cache_key(question, user_id)
+            history_len = 0
+            if user_id in self.qa_chains:
+                try:
+                    history_len = len(self.qa_chains[user_id].memory.chat_memory.messages)
+                except Exception:
+                    pass
+
+            cache_key = self._generate_cache_key(question, user_id, history_len)
             cached = self._get_from_cache(cache_key)
             if cached:
                 return cached
@@ -386,78 +332,49 @@ class RAGSystem:
             if user_id not in self.qa_chains:
                 self.create_qa_chain(user_id)
 
-            qa_chain = self.qa_chains[user_id]
-
-            response = qa_chain.invoke({"question": question})
-
+            response = self.qa_chains[user_id].invoke({"question": question})
             answer = response.get("answer", "")
             sources = response.get("source_documents", [])
 
-            # -- DEBUG PART --
-            print(f"\nDEBUG QUERY: '{question}'")
-            print(f"Sources found: {len(sources)}")
-            for idx, doc in enumerate(sources):
-                has_img = "img_" in doc.page_content
-                print(
-                    f"   [{idx + 1}] ...{doc.page_content[:40]}... (Has image? {has_img})"
-                )
-            # -----
-
-            final_images = []
-            seen_urls = set()
-
-            for doc in sources:
-                chunk_img_map = doc.metadata.get("image_map", {})
-
-                if not chunk_img_map:
-                    continue
-
-                found_ids = re.findall(r"(img_[a-f0-9]{8})", doc.page_content)
-
-                for img_id in found_ids:
-                    if img_id in chunk_img_map:
-                        url = chunk_img_map[img_id]
-                        if url not in seen_urls:
-                            final_images.append(url)
-                            seen_urls.add(url)
+            final_images = self._resolve_images_from_sources(sources)
 
             clean_answer = re.sub(r"\(?img_[a-f0-9]{8}\)?", "", answer)
-            clean_answer = re.sub(r"!\[.*?\]\(.*?\)", "", clean_answer)
-            clean_answer = clean_answer.strip()
+            clean_answer = re.sub(r"!\[.*?\]\(.*?\)", "", clean_answer).strip()
+
+            retrieval_cosine = {"mean": 0.0, "max": 0.0, "min": 0.0, "std": 0.0}
+            retrieval_diversity = 0.0
+            try:
+                from rag_statistics import RetrievalAnswerCorrelation
+                chunk_texts = [doc.page_content for doc in sources]
+                if chunk_texts:
+                    chunk_embeddings = self.embeddings.embed_documents(chunk_texts)
+                    query_vec = np.array(self.embeddings.embed_query(question))
+                    chunk_vecs = [np.array(e) for e in chunk_embeddings]
+                    retrieval_cosine = RetrievalAnswerCorrelation.chunk_query_cosine(query_vec, chunk_vecs)
+                    retrieval_diversity = RetrievalAnswerCorrelation.retrieval_diversity(chunk_vecs)
+            except Exception as emb_err:
+                config.logger.warning(f"Embedding stats error: {emb_err}")
 
             result = {
                 "answer": clean_answer,
                 "images": final_images,
                 "sources": sources,
+                "retrieval_cosine": retrieval_cosine,
+                "retrieval_diversity": retrieval_diversity,
             }
-
             self._save_to_cache(cache_key, result)
-
-            config.logger.info(
-                f"Answer generated. Found {len(final_images)} images in context."
-            )
-
             return result
 
         except Exception as e:
             config.logger.error(f"Query error: {e}")
             import traceback
-
             config.logger.error(traceback.format_exc())
-
-            return {
-                "answer": "Error occurred. Try /clear or rephrase the question.",
-                "images": [],
-                "sources": [],
-            }
+            return {"answer": "Произошла ошибка. Попробуй /clear или перефразируй вопрос.", "images": [], "sources": [], "retrieval_cosine": {}, "retrieval_diversity": 0.0}
 
     def clear_memory(self, user_id: int):
-        """Memory cleared."""
-
         if user_id in self.qa_chains:
             self.qa_chains[user_id].memory.clear()
             self._search_cache.clear()
-            config.logger.info(f"Memory cleared for user {user_id}")
 
 
 rag_system = RAGSystem()

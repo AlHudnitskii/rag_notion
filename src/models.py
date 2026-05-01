@@ -5,8 +5,6 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class QueryLog(BaseModel):
-    """Model for storing query logs."""
-
     timestamp: datetime = Field(default_factory=datetime.now)
     user_id: int
     username: str
@@ -19,7 +17,6 @@ class QueryLog(BaseModel):
     @field_validator("response_time", mode="before")
     @classmethod
     def convert_float_to_decimal(cls, v):
-        """Convert float to Decimal with 2 decimal places."""
         if isinstance(v, float):
             return Decimal(str(round(v, 2)))
         return v
@@ -29,8 +26,6 @@ class QueryLog(BaseModel):
 
 
 class Statistics(BaseModel):
-    """Model for aggregated statistics."""
-
     total_queries: int = 0
     unique_users: int = 0
     avg_response_time: Decimal = Field(default=Decimal("0.00"), decimal_places=2)
@@ -44,7 +39,6 @@ class Statistics(BaseModel):
     )
     @classmethod
     def convert_to_decimal(cls, v):
-        """Convert numeric values to Decimal."""
         if isinstance(v, (int, float)):
             return Decimal(str(round(float(v), 2)))
         return v
@@ -54,8 +48,6 @@ class Statistics(BaseModel):
 
 
 class FeedbackEntry(BaseModel):
-    """Model for user feedback on responses."""
-
     timestamp: datetime = Field(default_factory=datetime.now)
     user_id: int
     username: str

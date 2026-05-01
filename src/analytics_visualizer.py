@@ -28,13 +28,9 @@ class AnalyticsVisualizer:
 
     @staticmethod
     async def load_feedback_data() -> List[Dict]:
-        """Load feedback data"""
+        """Use config.FEEDBACK_FILE directly instead of path manipulation."""
         try:
-            async with aiofiles.open(
-                config.ANALYTICS_FILE.replace(".jsonl", "_feedback.jsonl"),
-                "r",
-                encoding="utf-8",
-            ) as f:
+            async with aiofiles.open(config.FEEDBACK_FILE, "r", encoding="utf-8") as f:
                 feedback = [json.loads(line) async for line in f]
             return feedback
         except FileNotFoundError:
@@ -67,9 +63,7 @@ class AnalyticsVisualizer:
             [date.strftime("%d.%m") for date in sorted_dates], rotation=45, ha="right"
         )
 
-        ax.set_title(
-            "Amount of requests per day", fontsize=14, fontweight="bold", pad=20
-        )
+        ax.set_title("Amount of requests per day", fontsize=14, fontweight="bold", pad=20)
         ax.set_xlabel("Date", fontsize=11)
         ax.set_ylabel("Amount of requests", fontsize=11)
         ax.grid(axis="y", alpha=0.3, linestyle="--")
@@ -119,9 +113,7 @@ class AnalyticsVisualizer:
             label=f"Average: {avg_time:.1f}s",
         )
 
-        ax.set_title(
-            "Response Time (Last Requests)", fontsize=14, fontweight="bold", pad=20
-        )
+        ax.set_title("Response Time (Last Requests)", fontsize=14, fontweight="bold", pad=20)
         ax.set_xlabel("Request Number", fontsize=11)
         ax.set_ylabel("Time (sec)", fontsize=11)
         ax.legend(loc="upper right")
