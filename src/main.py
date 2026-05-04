@@ -3,8 +3,8 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Mess
 import config
 from handlers import (
     button_callback, clear_command, error_handler, graphs_command,
-    handle_message, help_command, model_command, ragstats_command,
-    reload_command, start_command, stats_command,
+    handle_message, help_command, model_command, quality_command,
+    ragstats_command, reload_command, start_command, stats_command,
 )
 from rag_system import rag_system
 
@@ -29,6 +29,7 @@ def main():
     application.add_handler(CommandHandler("graphs", graphs_command))
     application.add_handler(CommandHandler("model", model_command))
     application.add_handler(CommandHandler("reload", reload_command))
+    application.add_handler(CommandHandler("quality", quality_command))
     application.add_handler(CommandHandler("ragstats", ragstats_command))
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

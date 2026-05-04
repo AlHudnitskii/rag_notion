@@ -447,19 +447,45 @@ async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     avg = report["average_metrics"]
     dist = report["quality_distribution"]
+    total = report["total_evaluations"]
+    latest = report.get("latest_score", 0)
+
+    def pct(key: str) -> str:
+        v = avg.get(key)
+        return f"{v:.1%}" if v is not None else "n/a"
+
     await update.message.reply_text(
         "📊 RAG Quality Report\n"
-        "─────────────────\n"
-        f"Relevance:    {avg.get('relevance', 0):.1%}\n"
-        f"Faithfulness: {avg.get('faithfulness', 0):.1%}\n"
-        f"Completeness: {avg.get('completeness', 0):.1%}\n"
-        f"Efficiency:   {avg.get('efficiency', 0):.1%}\n"
-        f"Overall:      {avg.get('overall_score', 0):.1%}\n\n"
-        "Distribution\n"
-        "─────────────────\n"
-        f"Excellent: {dist['excellent']}  Good: {dist['good']}\n"
-        f"Average:   {dist['average']}    Poor: {dist['poor']}\n\n"
-        f"Total evaluations: {report['total_evaluations']}",
+        "══════════════════════\n\n"
+        "Word-Level Matching (ROUGE-1)\n"
+        "─────────────────────────\n"
+        f"Precision  (P):  {pct('relevance')}\n"
+        f"Recall     (R):  {pct('source_coverage')}\n"
+        f"F1-Score (P+R):  {pct('rouge1_f1')}\n\n"
+        "Phrase-Level Grounding (ROUGE-2)\n"
+        "─────────────────────────\n"
+        f"Faithfulness:    {pct('faithfulness')}\n\n"
+        "Answer Quality\n"
+        "──────────────\n"
+        f"Completeness:    {pct('completeness')}\n"
+        f"Efficiency:      {pct('efficiency')}\n\n"
+        "Lexical & Information Stats\n"
+        "─────────────────────────\n"
+        f"Shannon Entropy: {avg.get('entropy', 0):.3f} bits\n"
+        f"Lexical Div TTR: {pct('lexical_diversity')}\n"
+        f"Jaccard QA:     {pct('q_a_jaccard')}\n\n"
+        "Overall Score  (weighted Σ)\n"
+        "────────────────────────\n"
+        f"Average:         {pct('overall_score')}\n"
+        f"Latest query:    {latest:.1%}\n\n"
+        "Score Distribution\n"
+        "──────────────────\n"
+        f"Excellent (≥80%): {dist['excellent']}\n"
+        f"Good      (60–80%): {dist['good']}\n"
+        f"Average   (40–60%): {dist['average']}\n"
+        f"Poor      (<40%):   {dist['poor']}\n\n"
+        f"Total evaluations: {total}\n\n"
+        "Weights: F1=25% · Faith=35% · Complete=25% · Effic=15%",
     )
 
 
