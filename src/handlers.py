@@ -25,17 +25,20 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
     keyboard = [
-        [InlineKeyboardButton("Help", callback_data="help")],
-        [InlineKeyboardButton("Statistics", callback_data="stats")],
-        [InlineKeyboardButton("Graphs", callback_data="graphs")],
-        [InlineKeyboardButton("Model", callback_data="model")],
-        [InlineKeyboardButton("Update DB", callback_data="reload")],
+        [InlineKeyboardButton("📖 Help", callback_data="help"), InlineKeyboardButton("📊 Statistics", callback_data="stats")],
+        [InlineKeyboardButton("📈 Graphs", callback_data="graphs"), InlineKeyboardButton("🤖 Model Info", callback_data="model")],
+        [InlineKeyboardButton("🔄 Update Knowledge Base", callback_data="reload")],
     ]
     await update.message.reply_text(
-        f"*Hello\\! I'm your local AI assistant*\n\n"
-        f"*Features:*\n\\- Fully local \\(Ollama \\+ HuggingFace\\)\n\\- Free and private\n"
-        f"\\- Remember conversation context\n\\- Work with your Notion notes\n\\- Analytics with graphs\n\n"
-        f"*Current model:* `{config.OLLAMA_MODEL}`\n\nSimply ask a question\\!",
+        f"*👋 Hello\\! I'm your Notion AI Assistant*\n\n"
+        f"I can answer questions based on your Notion notes using a fully local RAG pipeline\\.\n\n"
+        f"*What I can do:*\n"
+        f"\\- Search and retrieve relevant notes from your Notion workspace\n"
+        f"\\- Answer questions using context from those notes\n"
+        f"\\- Remember our conversation history\n"
+        f"\\- Show analytics and quality metrics\n\n"
+        f"*Current model:* `{config.OLLAMA_MODEL}`\n\n"
+        f"💬 Just send me any question to get started\\!",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="MarkdownV2",
     )
@@ -45,11 +48,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
     await update.message.reply_text(
-        "*Commands:*\n"
-        "/start /help /clear /stats /model /reload /graphs /ragstats\n\n"
-        f"*Model:* `{config.OLLAMA_MODEL}`\n"
-        "*DB:* FAISS \\(local\\)",
-        parse_mode="MarkdownV2",
+        "📖 Available Commands\n\n"
+        "/start    — Welcome message & main menu\n"
+        "/help     — Show this help message\n"
+        "/clear    — Clear conversation history\n"
+        "/stats    — Usage statistics\n"
+        "/quality  — RAG quality report\n"
+        "/model    — Current model details\n"
+        "/reload   — Reload knowledge base from Notion\n"
+        "/graphs   — Usage & feedback charts\n"
+        "/ragstats — Advanced RAG analytics\n\n"
+        f"Active model: {config.OLLAMA_MODEL}\n"
+        "Vector DB: FAISS (local)\n\n"
+        "💡 Tip: after each answer you can rate it with 👍 / 👎 and view the sources used.",
     )
 
 
@@ -59,7 +70,10 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     rag_system.clear_memory(user_id)
     user_contexts[user_id].clear()
-    await update.message.reply_text("Dialog history cleared!")
+    await update.message.reply_text(
+        "🗑 Conversation history cleared.\n\n"
+        "You can start a fresh conversation now."
+    )
 
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -67,14 +81,17 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     stats = await Analytics.get_stats()
     await update.message.reply_text(
-        f"Usage Statistics\n\n"
-        f"Total queries: {stats.get('total_queries', 0)}\n"
-        f"Unique users: {stats.get('unique_users', 0)}\n"
-        f"Avg response time: {stats.get('avg_response_time', 0)}s\n"
-        f"Avg sources: {stats.get('avg_sources', 0)}\n\n"
-        f"Likes: {stats.get('total_likes', 0)}\n"
-        f"Dislikes: {stats.get('total_dislikes', 0)}\n"
-        f"Satisfaction: {stats.get('satisfaction_rate', 0)}%\n\n"
+        "📊 Usage Statistics\n"
+        "─────────────────\n"
+        f"Total queries:      {stats.get('total_queries', 0)}\n"
+        f"Unique users:       {stats.get('unique_users', 0)}\n"
+        f"Avg response time:  {stats.get('avg_response_time', 0):.1f}s\n"
+        f"Avg sources used:   {stats.get('avg_sources', 0):.1f}\n\n"
+        "📝 Feedback\n"
+        "─────────────────\n"
+        f"👍 Likes:            {stats.get('total_likes', 0)}\n"
+        f"👎 Dislikes:         {stats.get('total_dislikes', 0)}\n"
+        f"Satisfaction rate:  {stats.get('satisfaction_rate', 0):.0f}%\n\n"
         f"Model: {config.OLLAMA_MODEL}",
     )
 
@@ -83,51 +100,69 @@ async def model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
     await update.message.reply_text(
-        f"🤖 Model Information\n\n"
-        f"Ollama URL: {config.OLLAMA_BASE_URL}\n"
-        f"Model: {config.OLLAMA_MODEL}\n"
-        f"Context: 3000 tokens | Temp: 0.1\n\n"
-        f"Embeddings: {config.EMBEDDING_MODEL}\n"
+        "🤖 Model Information\n"
+        "─────────────────\n"
+        f"Ollama URL:   {config.OLLAMA_BASE_URL}\n"
+        f"Model:        {config.OLLAMA_MODEL}\n"
+        f"Context:      3000 tokens\n"
+        f"Temperature:  0.1\n\n"
+        "📦 Embeddings\n"
+        "─────────────────\n"
+        f"Model:  {config.EMBEDDING_MODEL}\n"
         f"Device: CPU\n\n"
-        f"Vector DB: FAISS (local)\n"
-        f"Path: {config.VECTOR_DB_PATH}",
+        "🗄 Vector Database\n"
+        "─────────────────\n"
+        f"Engine: FAISS (local)\n"
+        f"Path:   {config.VECTOR_DB_PATH}",
     )
 
 
 async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-    await update.message.reply_text("Starting database update...")
+    await update.message.reply_text("🔄 Starting knowledge base update from Notion...")
     try:
         success = await rag_system.initialize(force_reload=True)
-        await update.message.reply_text("База обновлена." if success else "Ошибка обновления.")
+        if success:
+            await update.message.reply_text(
+                "✅ Knowledge base updated successfully!\n\n"
+                "All Notion pages have been re-indexed."
+            )
+        else:
+            await update.message.reply_text(
+                "❌ Update failed.\n\n"
+                "Please check the logs or try again later."
+            )
     except Exception as e:
         config.logger.error(f"Error in reload_command: {e}")
-        await update.message.reply_text(f"Ошибка: {e}")
+        await update.message.reply_text(
+            f"❌ An error occurred during update:\n{e}"
+        )
 
 
 async def graphs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
+    await update.message.reply_text("📈 Generating charts, please wait...")
     try:
         for generator, caption in [
-            (AnalyticsVisualizer.generate_usage_chart, "Usage by day"),
-            (AnalyticsVisualizer.generate_response_time_chart, "Response time"),
-            (AnalyticsVisualizer.generate_feedback_pie_chart, "Feedback"),
-            (AnalyticsVisualizer.generate_sources_histogram, "Sources used"),
+            (AnalyticsVisualizer.generate_usage_chart, "📅 Usage by day"),
+            (AnalyticsVisualizer.generate_response_time_chart, "⏱ Response time"),
+            (AnalyticsVisualizer.generate_feedback_pie_chart, "👍 Feedback breakdown"),
+            (AnalyticsVisualizer.generate_sources_histogram, "📚 Sources used per query"),
         ]:
             chart = await generator()
             if chart:
                 await update.message.reply_photo(photo=chart, caption=caption)
     except Exception as e:
         config.logger.error(f"Error generating graphs: {e}")
-        await update.message.reply_text("Error generating graphs")
+        await update.message.reply_text("❌ Error generating graphs. Please try again later.")
 
 
 async def ragstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-    await update.message.reply_text("Считаю статистику...")
+    await update.message.reply_text("📊 Calculating advanced RAG statistics, please wait...")
     try:
         import io
         import numpy as np
@@ -183,7 +218,7 @@ async def ragstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return buf
 
         fig, ax = make_fig()
-        ax.set_title("Ответы — Shannon Entropy & Lexical Diversity", color=FG, fontsize=11, pad=12, loc="left")
+        ax.set_title("Answers — Shannon Entropy & Lexical Diversity", color=FG, fontsize=11, pad=12, loc="left")
         ax2 = ax.twinx()
         ax2.set_facecolor(BG)
         ax2.tick_params(colors=DIM, labelsize=9)
@@ -212,7 +247,7 @@ async def ragstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buf1 = save(fig)
 
         fig, ax = make_fig()
-        ax.set_title("Векторный индекс — Cosine Similarity между чанками", color=FG, fontsize=11, pad=12, loc="left")
+        ax.set_title("Vector Index — Cosine Similarity Between Chunks", color=FG, fontsize=11, pad=12, loc="left")
         c_labels = ["min", "Q25", "median", "mean", "Q75", "max"]
         c_vals = [cos.get("min", 0), cos.get("q25", 0), cos.get("median", 0), cos.get("mean", 0), cos.get("q75", 0), cos.get("max", 0)]
         c_colors = [C2, C2, C1, HL, C2, C2]
@@ -230,14 +265,18 @@ async def ragstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buf2 = save(fig)
 
         fig, ax = make_fig(10, 5)
-        ax.set_title("Корреляции Pearson r — качество поиска → качество ответа", color=FG, fontsize=11, pad=12, loc="left")
+        ax.set_title("Pearson r Correlations — Retrieval Quality → Answer Quality", color=FG, fontsize=11, pad=12, loc="left")
         if corr_table:
-            label_map = {"relevance": "Релевантность", "faithfulness": "Достоверность",
-                         "completeness": "Полнота", "overall": "Итого"}
+            label_map = {
+                "relevance": "Relevance",
+                "faithfulness": "Faithfulness",
+                "completeness": "Completeness",
+                "overall": "Overall",
+            }
             metrics = list(corr_table.keys())
             r_cos = [corr_table[m].get("vs_cosine_mean", 0) for m in metrics]
             r_div = [corr_table[m].get("vs_diversity", 0) for m in metrics]
-            labels_ru = [label_map.get(m, m) for m in metrics]
+            labels_en = [label_map.get(m, m) for m in metrics]
             x = np.arange(len(metrics))
             w = 0.32
             b1 = ax.bar(x - w/2, r_cos, width=w, color=HL, label="cosine → quality")
@@ -249,64 +288,64 @@ async def ragstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ax.axhline(0.4, color="#555555", linewidth=0.7, linestyle="--")
             ax.axhline(-0.4, color="#555555", linewidth=0.7, linestyle="--")
             ax.set_xticks(x)
-            ax.set_xticklabels(labels_ru, color=FG, fontsize=10)
+            ax.set_xticklabels(labels_en, color=FG, fontsize=10)
             ax.set_ylabel("r", fontsize=9)
             ax.set_ylim(-1.15, 1.15)
             ax.legend(facecolor="#1a1a1a", edgecolor="#333333", labelcolor=FG, fontsize=8, loc="upper right")
-            ax.text(0.01, 0.03, "пунктир = порог ±0.4", transform=ax.transAxes, color=DIM, fontsize=8)
+            ax.text(0.01, 0.03, "dashed line = threshold ±0.4", transform=ax.transAxes, color=DIM, fontsize=8)
             ax.text(0.99, 0.03, f"n={corr_data.get('total_data_points', 0)}", transform=ax.transAxes, ha="right", color=DIM, fontsize=8)
         else:
             ax.axis("off")
-            ax.text(0.5, 0.5, "Данных пока нет (нужно >= 5 запросов)", ha="center", va="center", color=DIM, fontsize=11, transform=ax.transAxes)
+            ax.text(0.5, 0.5, "Not enough data yet (need >= 5 queries)", ha="center", va="center", color=DIM, fontsize=11, transform=ax.transAxes)
         fig.tight_layout()
         buf3 = save(fig)
 
         fig, ax = make_fig(8, 5)
-        ax.set_title("Обратная связь — сравнение лайков и дизлайков", color=FG, fontsize=11, pad=12, loc="left")
+        ax.set_title("Feedback — Likes vs Dislikes Comparison", color=FG, fontsize=11, pad=12, loc="left")
         if fb:
             fb_metrics = ["avg cosine", "avg quality", "avg diversity"]
             liked = [fb.get("liked_avg_cosine_mean", 0), fb.get("liked_avg_overall_quality", 0), fb.get("liked_avg_diversity", 0)]
             disliked = [fb.get("disliked_avg_cosine_mean", 0), fb.get("disliked_avg_overall_quality", 0), fb.get("disliked_avg_diversity", 0)]
             x = np.arange(len(fb_metrics))
             w = 0.32
-            b1 = ax.bar(x - w/2, liked, width=w, color=HL, label=f"лайки ({fb.get('like_count', 0)})")
-            b2 = ax.bar(x + w/2, disliked, width=w, color=C2, label=f"дизлайки ({fb.get('dislike_count', 0)})")
+            b1 = ax.bar(x - w/2, liked, width=w, color=HL, label=f"likes ({fb.get('like_count', 0)})")
+            b2 = ax.bar(x + w/2, disliked, width=w, color=C2, label=f"dislikes ({fb.get('dislike_count', 0)})")
             for b, v in zip(list(b1) + list(b2), liked + disliked):
                 ax.text(b.get_x() + b.get_width()/2, v + 0.01, f"{v:.3f}", ha="center", color=FG, fontsize=9)
             ax.set_xticks(x)
             ax.set_xticklabels(fb_metrics, color=FG, fontsize=10)
             ax.set_ylim(0, max(liked + disliked) * 1.3)
-            ax.set_ylabel("значение", fontsize=9)
+            ax.set_ylabel("value", fontsize=9)
             ax.legend(facecolor="#1a1a1a", edgecolor="#333333", labelcolor=FG, fontsize=8)
             lc = fb.get("like_count", 0)
             dc = fb.get("dislike_count", 0)
             sat = lc / (lc + dc) if (lc + dc) else 0
-            ax.text(0.98, 0.97, f"удовлетворённость {sat:.0%}", transform=ax.transAxes, ha="right", va="top", color=FG, fontsize=10)
+            ax.text(0.98, 0.97, f"satisfaction {sat:.0%}", transform=ax.transAxes, ha="right", va="top", color=FG, fontsize=10)
         else:
             ax.axis("off")
-            ax.text(0.5, 0.5, "Нет данных обратной связи", ha="center", va="center", color=DIM, fontsize=11, transform=ax.transAxes)
+            ax.text(0.5, 0.5, "No feedback data available yet", ha="center", va="center", color=DIM, fontsize=11, transform=ax.transAxes)
         fig.tight_layout()
         buf4 = save(fig)
 
         fig, ax = make_fig(9, 4)
         ax.axis("off")
-        ax.set_title("Сводка", color=FG, fontsize=11, pad=12, loc="left")
+        ax.set_title("Summary", color=FG, fontsize=11, pad=12, loc="left")
         lc = fb.get("like_count", 0)
         dc = fb.get("dislike_count", 0)
         sat_str = f"{lc/(lc+dc):.0%}" if (lc + dc) else "—"
         rows = [
-            ["Запросов", str(ans.get("sample_size", 0))],
+            ["Queries", str(ans.get("sample_size", 0))],
             ["Entropy avg / std", f"{ent.get('mean', 0):.3f} / {ent.get('std', 0):.3f}"],
             ["Diversity avg / std", f"{div_s.get('mean', 0):.3f} / {div_s.get('std', 0):.3f}"],
-            ["Векторов / dim", f"{idx.get('total_vectors', '—')} / {idx.get('vector_dim', '—')}"],
+            ["Vectors / dim", f"{idx.get('total_vectors', '—')} / {idx.get('vector_dim', '—')}"],
             ["Cosine avg / std", f"{cos.get('mean', 0):.3f} / {cos.get('std', 0):.3f}"],
             ["Intra-cluster dist", str(icd)],
             ["PCA variance 2D", f"{pca_var:.1%}"],
-            ["Корреляций записано", str(corr_data.get("total_data_points", 0))],
-            ["Лайков / дизлайков", f"{lc} / {dc}"],
-            ["Удовлетворённость", sat_str],
+            ["Correlation records", str(corr_data.get("total_data_points", 0))],
+            ["Likes / Dislikes", f"{lc} / {dc}"],
+            ["Satisfaction", sat_str],
         ]
-        tbl = ax.table(cellText=rows, colLabels=["Метрика", "Значение"], loc="center", cellLoc="left", bbox=[0, 0, 1, 1])
+        tbl = ax.table(cellText=rows, colLabels=["Metric", "Value"], loc="center", cellLoc="left", bbox=[0, 0, 1, 1])
         tbl.auto_set_font_size(False)
         tbl.set_fontsize(10)
         for (r, c), cell in tbl.get_celld().items():
@@ -324,7 +363,7 @@ async def ragstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         config.logger.error(f"ragstats error: {e}")
-        await update.message.reply_text(f"Error: {e}")
+        await update.message.reply_text(f"❌ Error generating RAG statistics: {e}")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -381,10 +420,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     quality_indicator = RAGQualityMetrics.interpret_score(quality_metrics["overall_score"])
 
     keyboard = [
-        [InlineKeyboardButton("Sources", callback_data=f"sources_{user_id}")],
-        [InlineKeyboardButton("Quality", callback_data=f"quality_{user_id}")],
-        [InlineKeyboardButton("Clear Context", callback_data="clear_context")],
-        [InlineKeyboardButton("Like", callback_data="feedback_good"), InlineKeyboardButton("Dislike", callback_data="feedback_bad")],
+        [InlineKeyboardButton("👍 Like", callback_data="feedback_good"), InlineKeyboardButton("👎 Dislike", callback_data="feedback_bad")],
+        [InlineKeyboardButton("📚 Sources", callback_data=f"sources_{user_id}"), InlineKeyboardButton("📊 Quality", callback_data=f"quality_{user_id}")],
+        [InlineKeyboardButton("🗑 Clear Context", callback_data="clear_context")],
     ]
 
     footer = f"\n\nSources: {len(unique_sources)} | Time: {response_time:.1f}s | {quality_indicator}"
@@ -410,15 +448,18 @@ async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     avg = report["average_metrics"]
     dist = report["quality_distribution"]
     await update.message.reply_text(
-        f"RAG Quality Report\n\n"
+        "📊 RAG Quality Report\n"
+        "─────────────────\n"
         f"Relevance:    {avg.get('relevance', 0):.1%}\n"
         f"Faithfulness: {avg.get('faithfulness', 0):.1%}\n"
         f"Completeness: {avg.get('completeness', 0):.1%}\n"
         f"Efficiency:   {avg.get('efficiency', 0):.1%}\n"
         f"Overall:      {avg.get('overall_score', 0):.1%}\n\n"
+        "Distribution\n"
+        "─────────────────\n"
         f"Excellent: {dist['excellent']}  Good: {dist['good']}\n"
-        f"Average: {dist['average']}  Poor: {dist['poor']}\n"
-        f"Total: {report['total_evaluations']}",
+        f"Average:   {dist['average']}    Poor: {dist['poor']}\n\n"
+        f"Total evaluations: {report['total_evaluations']}",
     )
 
 
@@ -435,62 +476,88 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "help":
         if query.message:
             await query.message.reply_text(
-                f"Commands: /start /help /clear /stats /model /reload /graphs /ragstats\n"
-                f"Model: {config.OLLAMA_MODEL}"
+                "📖 Available Commands\n\n"
+                "/start    — Welcome message & main menu\n"
+                "/help     — Show this help message\n"
+                "/clear    — Clear conversation history\n"
+                "/stats    — Usage statistics\n"
+                "/quality  — RAG quality report\n"
+                "/model    — Current model details\n"
+                "/reload   — Reload knowledge base from Notion\n"
+                "/graphs   — Usage & feedback charts\n"
+                "/ragstats — Advanced RAG analytics\n\n"
+                f"Active model: {config.OLLAMA_MODEL}"
             )
 
     elif data == "stats":
         if query.message:
             stats = await Analytics.get_stats()
             await query.message.reply_text(
-                f"Queries: {stats.get('total_queries', 0)}\n"
-                f"Users: {stats.get('unique_users', 0)}\n"
-                f"Avg time: {stats.get('avg_response_time', 0)}s"
+                "📊 Usage Statistics\n"
+                "─────────────────\n"
+                f"Total queries:     {stats.get('total_queries', 0)}\n"
+                f"Unique users:      {stats.get('unique_users', 0)}\n"
+                f"Avg response time: {stats.get('avg_response_time', 0):.1f}s\n\n"
+                f"👍 Likes:    {stats.get('total_likes', 0)}\n"
+                f"👎 Dislikes: {stats.get('total_dislikes', 0)}\n"
+                f"Satisfaction: {stats.get('satisfaction_rate', 0):.0f}%"
             )
 
     elif data.startswith("quality_"):
         if query.message:
             quality = user_contexts[user_id].get("last_quality", {})
             if quality:
+                score = quality.get("overall_score", 0)
+                label = RAGQualityMetrics.interpret_score(score)
                 await query.message.reply_text(
-                    f"Quality of Last Answer:\n\n"
+                    "📊 Last Answer Quality\n"
+                    "─────────────────\n"
                     f"Relevance:    {quality.get('relevance', 0):.1%}\n"
                     f"Faithfulness: {quality.get('faithfulness', 0):.1%}\n"
                     f"Completeness: {quality.get('completeness', 0):.1%}\n"
                     f"Efficiency:   {quality.get('efficiency', 0):.1%}\n\n"
-                    f"Overall: {RAGQualityMetrics.interpret_score(quality.get('overall_score', 0))} "
-                    f"({quality.get('overall_score', 0):.1%})"
+                    f"Overall: {label} ({score:.1%})"
                 )
             else:
-                await query.message.reply_text("Metrics not available")
+                await query.message.reply_text(
+                    "No quality metrics available yet.\n\n"
+                    "Ask a question first to see quality data."
+                )
 
     elif data == "model":
         if query.message:
-            await query.message.reply_text(f"Model: {config.OLLAMA_MODEL}\nURL: {config.OLLAMA_BASE_URL}")
+            await query.message.reply_text(
+                f"🤖 Model: {config.OLLAMA_MODEL}\n"
+                f"URL: {config.OLLAMA_BASE_URL}"
+            )
 
     elif data == "graphs":
         if query.message:
+            await query.message.reply_text("📈 Generating charts...")
             try:
                 for generator, caption in [
-                    (AnalyticsVisualizer.generate_usage_chart, "Bot Usage"),
-                    (AnalyticsVisualizer.generate_response_time_chart, "Response Time"),
-                    (AnalyticsVisualizer.generate_feedback_pie_chart, "Feedback"),
-                    (AnalyticsVisualizer.generate_sources_histogram, "Sources"),
+                    (AnalyticsVisualizer.generate_usage_chart, "📅 Bot usage by day"),
+                    (AnalyticsVisualizer.generate_response_time_chart, "⏱ Response time"),
+                    (AnalyticsVisualizer.generate_feedback_pie_chart, "👍 Feedback breakdown"),
+                    (AnalyticsVisualizer.generate_sources_histogram, "📚 Sources per query"),
                 ]:
                     chart = await generator()
                     if chart:
                         await query.message.reply_photo(photo=chart, caption=caption)
             except Exception as e:
-                await query.message.reply_text("Error generating graphs")
+                await query.message.reply_text("❌ Error generating graphs. Please try again later.")
 
     elif data == "reload":
         if query.message:
-            await query.message.reply_text("Updating database...")
+            await query.message.reply_text("🔄 Updating knowledge base from Notion...")
             try:
                 success = await rag_system.initialize(force_reload=True)
-                await query.message.reply_text("Обновлено." if success else "Ошибка.")
+                if success:
+                    await query.message.reply_text("✅ Knowledge base updated successfully!")
+                else:
+                    await query.message.reply_text("❌ Update failed. Please try again later.")
             except Exception as e:
-                await query.message.reply_text(f"Error: {e}")
+                await query.message.reply_text(f"❌ Error: {e}")
 
     elif data.startswith("sources_"):
         if query.message:
@@ -499,19 +566,25 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 import re as _re
                 def clean_title(t):
                     return _re.sub(r'^\d+\.\s*', '', t).strip() or t
-                lines = ["Источники:"]
+                lines = ["📚 Sources used for this answer:\n"]
                 for i, s in enumerate(sources, 1):
                     title = clean_title(s.metadata.get("title", "Untitled"))
                     url = s.metadata.get("source", "")
                     lines.append(f"{i}. {title}" + (f"\n   {url}" if url else ""))
                 await query.message.reply_text("\n".join(lines))
             else:
-                await query.message.reply_text("Источники не найдены")
+                await query.message.reply_text(
+                    "No sources found for this answer.\n\n"
+                    "This may happen when the answer was generated without retrieving Notion pages."
+                )
 
     elif data == "clear_context":
         rag_system.clear_memory(user_id)
         if query.message:
-            await query.message.reply_text("Context cleared!")
+            await query.message.reply_text(
+                "🗑 Context cleared!\n\n"
+                "You can start a fresh conversation now."
+            )
 
     elif data in ["feedback_good", "feedback_bad"]:
         if query.message:
@@ -524,7 +597,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             answer = user_contexts[user_id].get("last_answer", "")
 
             if not question or not answer:
-                await query.message.reply_text("No recent query to rate.")
+                await query.message.reply_text("No recent answer to rate. Ask a question first!")
                 return
 
             await Analytics.update_feedback(user_id, username, question, answer, feedback)
@@ -538,10 +611,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             user_contexts[user_id]["feedback_given"] = True
-            await query.message.reply_text(
-                "Thanks for the feedback!" if feedback == "like"
-                else "Thanks! Try rephrasing or use /clear."
-            )
+            if feedback == "like":
+                await query.message.reply_text(
+                    "👍 Thanks for the positive feedback!\n\n"
+                    "I'm glad the answer was helpful."
+                )
+            else:
+                await query.message.reply_text(
+                    "👎 Thanks for the feedback!\n\n"
+                    "Try rephrasing your question or use /clear to reset context if I seem confused."
+                )
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -550,6 +629,9 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config.logger.error(traceback.format_exc())
     if update and update.effective_message:
         try:
-            await update.effective_message.reply_text("An error occurred. Try /clear or /reload.")
+            await update.effective_message.reply_text(
+                "⚠️ An unexpected error occurred.\n\n"
+                "Try /clear to reset your context, or /reload to refresh the knowledge base."
+            )
         except Exception as e:
             config.logger.error(f"Error while replying to error: {e}")
