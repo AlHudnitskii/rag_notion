@@ -16,7 +16,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "800"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "100"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150"))
 
 SEPARATORS = [
     "\n## ", "\n### ", "\n#### ", "\n\n", "\n",

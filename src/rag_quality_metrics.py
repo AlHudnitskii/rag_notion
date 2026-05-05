@@ -1,9 +1,8 @@
 import json
-import math
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Set
+from typing import Dict, List
 
 import aiofiles
 
@@ -18,7 +17,7 @@ _STOP_WORDS = {
 
 
 class RAGQualityMetrics:
-    # ROUGE-1 Precision  P = |W_ans ∩ W_src| / |W_ans|
+    # ROUGE-1 Precision (Relevance)  P = |W_ans ∩ W_src| / |W_ans|
     @staticmethod
     async def calculate_relevance_score(sources: List, answer: str) -> float:
         if not sources or not answer:
@@ -53,7 +52,7 @@ class RAGQualityMetrics:
 
 
     @staticmethod
-    def _get_ngrams(text: str, n: int) -> Set[str]:
+    def _get_ngrams(text: str, n: int) -> set:
         words = [w.lower() for w in re.findall(r"\w+", text) if len(w) > 2]
         if len(words) < n:
             return set()
@@ -100,25 +99,6 @@ class RAGQualityMetrics:
             return round(max(0.7 - (response_time - 15) / 60, 0.2), 4)
 
 
-    # Shannon Entropy  H = −sum(p_i * log2(p_i))
-    @staticmethod
-    def _shannon_entropy(text: str) -> float:
-        words = re.findall(r"\w+", text.lower())
-        if not words:
-            return 0.0
-        freq = Counter(words)
-        total = len(words)
-        return round(-sum((c / total) * math.log2(c / total) for c in freq.values()), 4)
-
-
-    # Lexical Diversity     TTR = |V| / N
-    @staticmethod
-    def _lexical_diversity(text: str) -> float:
-        words = re.findall(r"\w+", text.lower())
-        if not words:
-            return 0.0
-        return round(len(set(words)) / len(words), 4)
-
     @classmethod
     async def evaluate_rag_response(
         cls, question: str, answer: str, sources: List, response_time: float
@@ -159,8 +139,8 @@ class RAGQualityMetrics:
             "timestamp": datetime.now().isoformat(),
             "user_id": user_id,
             "question_length": len(question),
-            "entropy": RAGQualityMetrics._shannon_entropy(answer),
-            "lexical_diversity": RAGQualityMetrics._lexical_diversity(answer),
+            "entropy": AnswerStatistics.shannon_entropy(answer),
+            "lexical_diversity": AnswerStatistics.lexical_diversity(answer),
             "q_a_jaccard": AnswerStatistics.jaccard_similarity(question, answer),
             **metrics,
         }
@@ -213,7 +193,7 @@ class RAGQualityMetrics:
             return "Excellent"
         elif score >= 0.6:
             return "Good"
-        elif score >= 0.4:
+        elif score >= 0.35:
             return "Average"
         else:
             return "Poor"

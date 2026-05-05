@@ -1,4 +1,7 @@
+import asyncio
 import datetime
+import html
+import re
 from collections import defaultdict
 from typing import Dict
 
@@ -15,9 +18,33 @@ from rag_system import rag_system
 user_contexts: Dict[int, Dict] = defaultdict(dict)
 
 
-def _escape_md(text: str) -> str:
-    for ch in ["_", "*", "`", "["]:
-        text = text.replace(ch, f"\\{ch}")
+def _md_to_telegram_html(text: str) -> str:
+    """Convert LLM markdown output to Telegram HTML (parse_mode='HTML')."""
+    code_blocks: list[str] = []
+    inline_codes: list[str] = []
+
+    def save_fenced(m: re.Match) -> str:
+        code_blocks.append(f"<pre><code>{html.escape(m.group(2))}</code></pre>")
+        return f"\x00BLOCK{len(code_blocks) - 1}\x00"
+
+    def save_inline(m: re.Match) -> str:
+        inline_codes.append(f"<code>{html.escape(m.group(1))}</code>")
+        return f"\x00INLINE{len(inline_codes) - 1}\x00"
+
+    text = re.sub(r"```(\w*)\n?(.*?)```", save_fenced, text, flags=re.DOTALL)
+    text = re.sub(r"`([^`\n]+)`", save_inline, text)
+    text = html.escape(text, quote=False)
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text, flags=re.DOTALL)
+    text = re.sub(r"\*([^\s*][^*]*?)\*", r"<i>\1</i>", text)
+    text = re.sub(r"__(.+?)__", r"<u>\1</u>", text, flags=re.DOTALL)
+    text = re.sub(r"_([^\s_][^_]*?)_", r"<i>\1</i>", text)
+    text = re.sub(r"^#{1,6}\s+(.+)$", r"<b>\1</b>", text, flags=re.MULTILINE)
+
+    for i, block in enumerate(inline_codes):
+        text = text.replace(f"\x00INLINE{i}\x00", block)
+    for i, block in enumerate(code_blocks):
+        text = text.replace(f"\x00BLOCK{i}\x00", block)
+
     return text
 
 
@@ -366,6 +393,35 @@ async def ragstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error generating RAG statistics: {e}")
 
 
+async def _run_post_query_tasks(
+    user_id: int,
+    username: str,
+    question: str,
+    answer: str,
+    sources: list,
+    response_time: float,
+    quality_metrics: dict,
+):
+    loop = asyncio.get_event_loop()
+    stats = await loop.run_in_executor(None, rag_system.compute_retrieval_stats, question, sources)
+    retrieval_cosine = stats["retrieval_cosine"]
+    retrieval_diversity = stats["retrieval_diversity"]
+
+    user_contexts[user_id]["retrieval_cosine"] = retrieval_cosine
+    user_contexts[user_id]["retrieval_diversity"] = retrieval_diversity
+
+    await RAGQualityMetrics.save_quality_metrics(user_id=user_id, question=question, metrics=quality_metrics, answer=answer)
+    await Analytics.log_query(user_id, username, question, answer, len(sources), response_time)
+    await RetrievalAnswerCorrelation.save_retrieval_metrics(
+        user_id=user_id,
+        question=question,
+        retrieval_cosine_stats=retrieval_cosine,
+        retrieval_diversity=retrieval_diversity,
+        quality_metrics=quality_metrics,
+        feedback=None,
+    )
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user or not update.message or not update.message.text:
         return
@@ -377,28 +433,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     config.logger.info(f"Question from @{username} (ID: {user_id}): {question}")
     await update.message.chat.send_action(action="typing")
 
+    loop = asyncio.get_event_loop()
     start_time = datetime.datetime.now()
-    result = rag_system.query(question, user_id)
+    result = await loop.run_in_executor(None, rag_system.query, question, user_id)
     response_time = float((datetime.datetime.now() - start_time).total_seconds())
 
     answer = result["answer"]
     sources = result["sources"]
     images = result.get("images", [])
-    retrieval_cosine = result.get("retrieval_cosine", {})
-    retrieval_diversity = result.get("retrieval_diversity", 0.0)
 
     quality_metrics = await RAGQualityMetrics.evaluate_rag_response(
         question=question, answer=answer, sources=sources, response_time=response_time
-    )
-    await RAGQualityMetrics.save_quality_metrics(user_id=user_id, question=question, metrics=quality_metrics, answer=answer)
-    await Analytics.log_query(user_id, username, question, answer, len(sources), response_time)
-    await RetrievalAnswerCorrelation.save_retrieval_metrics(
-        user_id=user_id,
-        question=question,
-        retrieval_cosine_stats=retrieval_cosine,
-        retrieval_diversity=retrieval_diversity,
-        quality_metrics=quality_metrics,
-        feedback=None,
     )
 
     seen_titles = set()
@@ -413,8 +458,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_contexts[user_id]["last_answer"] = answer
     user_contexts[user_id]["last_sources"] = unique_sources
     user_contexts[user_id]["last_quality"] = quality_metrics
-    user_contexts[user_id]["retrieval_cosine"] = retrieval_cosine
-    user_contexts[user_id]["retrieval_diversity"] = retrieval_diversity
+    user_contexts[user_id]["retrieval_cosine"] = {}
+    user_contexts[user_id]["retrieval_diversity"] = 0.0
     user_contexts[user_id]["feedback_given"] = False
 
     quality_indicator = RAGQualityMetrics.interpret_score(quality_metrics["overall_score"])
@@ -426,16 +471,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     footer = f"\n\nSources: {len(unique_sources)} | Time: {response_time:.1f}s | {quality_indicator}"
-    await update.message.reply_text(
-        answer + footer,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
+    try:
+        await update.message.reply_text(
+            _md_to_telegram_html(answer) + html.escape(footer, quote=False),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML",
+        )
+    except Exception:
+        await update.message.reply_text(
+            answer + footer,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
 
     if images:
         try:
             await update.message.reply_photo(photo=images[0])
         except Exception as e:
             config.logger.warning(f"Failed to send image: {e}")
+
+    asyncio.create_task(_run_post_query_tasks(
+        user_id, username, question, answer, sources, response_time, quality_metrics
+    ))
 
 
 async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -542,6 +598,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"Faithfulness: {quality.get('faithfulness', 0):.1%}\n"
                     f"Completeness: {quality.get('completeness', 0):.1%}\n"
                     f"Efficiency:   {quality.get('efficiency', 0):.1%}\n\n"
+                    f""
                     f"Overall: {label} ({score:.1%})"
                 )
             else:

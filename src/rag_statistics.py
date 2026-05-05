@@ -3,7 +3,7 @@ import math
 import re
 from collections import Counter, defaultdict
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import aiofiles
 import numpy as np
@@ -54,61 +54,6 @@ class AnswerStatistics:
         intersection = words_a & words_b
         union = words_a | words_b
         return round(len(intersection) / len(union), 4)
-
-    @staticmethod
-    def answer_structure_score(answer: str) -> Dict[str, Any]:
-        has_headers = bool(re.search(r"^#+\s", answer, re.MULTILINE))
-        has_bullets = bool(re.search(r"^[-*]\s", answer, re.MULTILINE))
-        has_numbered = bool(re.search(r"^\d+\.\s", answer, re.MULTILINE))
-        has_code = "```" in answer
-        has_bold = bool(re.search(r"\*\*\w", answer))
-
-        sentences = [s.strip() for s in re.split(r"[.!?]+", answer) if s.strip()]
-        avg_sentence_len = (
-            sum(len(s.split()) for s in sentences) / len(sentences)
-            if sentences else 0
-        )
-
-        structure_score = sum([
-            0.2 if has_headers else 0,
-            0.2 if has_bullets or has_numbered else 0,
-            0.25 if has_code else 0,
-            0.15 if has_bold else 0,
-            min(len(sentences) / 10, 0.2),
-        ])
-
-        return {
-            "has_headers": has_headers,
-            "has_bullets": has_bullets or has_numbered,
-            "has_code": has_code,
-            "sentence_count": len(sentences),
-            "avg_sentence_len_words": round(avg_sentence_len, 2),
-            "structure_score": round(structure_score, 4),
-        }
-
-    @staticmethod
-    def word_frequency_distribution(text: str, top_n: int = 10) -> List[Tuple[str, int]]:
-        stop_words = {
-            "и", "в", "на", "с", "для", "по", "из", "к", "о", "от", "до",
-            "это", "что", "как", "не", "но", "а", "или", "если", "то", "при",
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "of", "in", "to", "and", "or", "for", "that", "this", "it",
-        }
-        words = [w for w in re.findall(r"\w{3,}", text.lower()) if w not in stop_words]
-        return Counter(words).most_common(top_n)
-
-    @classmethod
-    def full_answer_analysis(cls, question: str, answer: str) -> Dict[str, Any]:
-        return {
-            "entropy": cls.shannon_entropy(answer),
-            "lexical_diversity": cls.lexical_diversity(answer),
-            "q_a_jaccard": cls.jaccard_similarity(question, answer),
-            "structure": cls.answer_structure_score(answer),
-            "top_words": cls.word_frequency_distribution(answer, top_n=5),
-            "char_count": len(answer),
-            "word_count": len(re.findall(r"\w+", answer)),
-        }
-
 
 class VectorStatistics:
     @staticmethod
@@ -166,16 +111,6 @@ class VectorStatistics:
 
         return round(float(np.mean(diffs)), 4) if diffs else 0.0
 
-    @staticmethod
-    def vector_norm_distribution(vectors: np.ndarray) -> Dict[str, float]:
-        norms = np.linalg.norm(vectors, axis=1)
-        return {
-            "mean_norm": round(float(np.mean(norms)), 4),
-            "std_norm": round(float(np.std(norms)), 4),
-            "min_norm": round(float(np.min(norms)), 4),
-            "max_norm": round(float(np.max(norms)), 4),
-        }
-
     @classmethod
     def analyze_faiss_index(cls, vectorstore) -> Dict[str, Any]:
         try:
@@ -195,7 +130,6 @@ class VectorStatistics:
             cosine_stats = cls.cosine_distribution_stats(vectors)
             pca_result = cls.pca_projection(vectors, n_components=2)
             intra_dist = cls.intra_cluster_distance(vectors)
-            norm_stats = cls.vector_norm_distribution(vectors)
 
             return {
                 "index_info": {
@@ -206,7 +140,6 @@ class VectorStatistics:
                 "cosine_similarity": cosine_stats,
                 "pca": pca_result,
                 "intra_cluster_distance": intra_dist,
-                "norm_distribution": norm_stats,
             }
 
         except Exception as e:

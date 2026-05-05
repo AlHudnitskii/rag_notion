@@ -29,7 +29,7 @@ class RAGSystem:
         self._search_cache = {}
         self._cache_max_size = 100
         self.max_context_messages = 3
-        self.max_tokens_per_context = 3000
+        self.max_tokens_per_context = 4096
 
         self.embeddings = HuggingFaceEmbeddings(
             model_name=config.EMBEDDING_MODEL,
@@ -41,11 +41,12 @@ class RAGSystem:
             model=str(config.OLLAMA_MODEL),
             base_url=str(config.OLLAMA_BASE_URL),
             temperature=0.1,
-            num_ctx=3000,
-            num_predict=512,
+            num_ctx=4096,
+            num_predict=700,
             repeat_penalty=1.1,
             top_k=20,
             top_p=0.85,
+            keep_alive=-1,
             stop=["<|end_of_text|>", "\nВОПРОС:", "ВОПРОС:", "\nUser:", "\nHuman:"],
             num_thread=os.cpu_count() or 4,
         )
@@ -235,30 +236,15 @@ class RAGSystem:
 
         faiss_retriever = self.vectorstore.as_retriever(
             search_type="mmr",
-            search_kwargs={"k": 5, "fetch_k": 15, "lambda_mult": 0.7},
+            search_kwargs={"k": 6, "fetch_k": 20, "lambda_mult": 0.7},
         )
 
         if self.bm25_retriever:
-            self.bm25_retriever.k = 5
+            self.bm25_retriever.k = 4
             ensemble = EnsembleRetriever(
                 retrievers=[self.bm25_retriever, faiss_retriever],
-                weights=[0.4, 0.6],
+                weights=[0.35, 0.65],
             )
-            seen_in_retriever = set()
-            _k = 3
-
-            def _dedup_invoke(query, _e=ensemble, _seen=seen_in_retriever, _k=_k):
-                docs = _e.invoke(query)
-                result = []
-                seen = set()
-                for doc in docs:
-                    key = doc.page_content[:200]
-                    if key not in seen:
-                        seen.add(key)
-                        result.append(doc)
-                    if len(result) >= _k:
-                        break
-                return result
 
             from langchain_core.retrievers import BaseRetriever
             from langchain_core.callbacks import CallbackManagerForRetrieverRun
@@ -272,7 +258,7 @@ class RAGSystem:
                         if key not in seen:
                             seen.add(key)
                             result.append(doc)
-                        if len(result) >= 3:
+                        if len(result) >= 5:
                             break
                     return result
 
@@ -341,26 +327,12 @@ class RAGSystem:
             clean_answer = re.sub(r"\(?img_[a-f0-9]{8}\)?", "", answer)
             clean_answer = re.sub(r"!\[.*?\]\(.*?\)", "", clean_answer).strip()
 
-            retrieval_cosine = {"mean": 0.0, "max": 0.0, "min": 0.0, "std": 0.0}
-            retrieval_diversity = 0.0
-            try:
-                from rag_statistics import RetrievalAnswerCorrelation
-                chunk_texts = [doc.page_content for doc in sources]
-                if chunk_texts:
-                    chunk_embeddings = self.embeddings.embed_documents(chunk_texts)
-                    query_vec = np.array(self.embeddings.embed_query(question))
-                    chunk_vecs = [np.array(e) for e in chunk_embeddings]
-                    retrieval_cosine = RetrievalAnswerCorrelation.chunk_query_cosine(query_vec, chunk_vecs)
-                    retrieval_diversity = RetrievalAnswerCorrelation.retrieval_diversity(chunk_vecs)
-            except Exception as emb_err:
-                config.logger.warning(f"Embedding stats error: {emb_err}")
-
             result = {
                 "answer": clean_answer,
                 "images": final_images,
                 "sources": sources,
-                "retrieval_cosine": retrieval_cosine,
-                "retrieval_diversity": retrieval_diversity,
+                "retrieval_cosine": {"mean": 0.0, "max": 0.0, "min": 0.0, "std": 0.0},
+                "retrieval_diversity": 0.0,
             }
             self._save_to_cache(cache_key, result)
             return result
@@ -370,6 +342,22 @@ class RAGSystem:
             import traceback
             config.logger.error(traceback.format_exc())
             return {"answer": "Произошла ошибка. Попробуй /clear или перефразируй вопрос.", "images": [], "sources": [], "retrieval_cosine": {}, "retrieval_diversity": 0.0}
+
+    def compute_retrieval_stats(self, question: str, sources: List[Document]) -> Dict:
+        retrieval_cosine = {"mean": 0.0, "max": 0.0, "min": 0.0, "std": 0.0}
+        retrieval_diversity = 0.0
+        try:
+            from rag_statistics import RetrievalAnswerCorrelation
+            chunk_texts = [doc.page_content for doc in sources]
+            if chunk_texts:
+                chunk_embeddings = self.embeddings.embed_documents(chunk_texts)
+                query_vec = np.array(self.embeddings.embed_query(question))
+                chunk_vecs = [np.array(e) for e in chunk_embeddings]
+                retrieval_cosine = RetrievalAnswerCorrelation.chunk_query_cosine(query_vec, chunk_vecs)
+                retrieval_diversity = RetrievalAnswerCorrelation.retrieval_diversity(chunk_vecs)
+        except Exception as emb_err:
+            config.logger.warning(f"Embedding stats error: {emb_err}")
+        return {"retrieval_cosine": retrieval_cosine, "retrieval_diversity": retrieval_diversity}
 
     def clear_memory(self, user_id: int):
         if user_id in self.qa_chains:
